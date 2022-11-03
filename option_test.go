@@ -64,7 +64,7 @@ func TestOption_UnwrapOrDefault(t *testing.T) {
 
 	assert.Equal(t, "1909", year.UnwrapOrDefault())
 	assert.Equal(t, "", badYear.UnwrapOrDefault())
-	assert.Equal(t, "test", shepard.None[testutils.TestType]().GetOrInsertDefault().Val)
+	assert.Equal(t, "test", shepard.None[testutils.TestType]().Mut().GetOrInsertDefault().Val)
 }
 
 func TestOption_OkOr(t *testing.T) {
@@ -106,12 +106,12 @@ func TestOption_And(t *testing.T) {
 }
 
 func TestOption_AndThen(t *testing.T) {
-	square := shepard.OptionAndThenFunc[int](func(val *int) *shepard.Option[int] {
+	square := shepard.OptionAndThenFunc[int](func(val *int) shepard.Option[int] {
 		*val = *val * *val
 		return shepard.Some[int](*val)
 	})
 
-	fail := shepard.OptionAndThenFunc[int](func(val *int) *shepard.Option[int] {
+	fail := shepard.OptionAndThenFunc[int](func(val *int) shepard.Option[int] {
 		return shepard.None[int]()
 	})
 
@@ -149,10 +149,10 @@ func TestOption_Or(t *testing.T) {
 }
 
 func TestOption_OrElse(t *testing.T) {
-	nobody := shepard.OptionOrElseFunc[string](func() *shepard.Option[string] {
+	nobody := shepard.OptionOrElseFunc[string](func() shepard.Option[string] {
 		return shepard.None[string]()
 	})
-	vikings := shepard.OptionOrElseFunc[string](func() *shepard.Option[string] {
+	vikings := shepard.OptionOrElseFunc[string](func() shepard.Option[string] {
 		return shepard.Some[string]("vikings")
 	})
 
@@ -251,7 +251,7 @@ func TestOption_Replace(t *testing.T) {
 
 func BenchmarkOption_Unwrap(b *testing.B) {
 	for n := 0; n < b.N; n++ {
-		shepard.Some[int](1).Unwrap()
+		shepard.Some[int](n).Unwrap()
 	}
 }
 
@@ -263,24 +263,24 @@ func BenchmarkOption_UnwrapCustomType(b *testing.B) {
 
 func BenchmarkOption_GetOrInsertDefault(b *testing.B) {
 	for n := 0; n < b.N; n++ {
-		shepard.None[int]().GetOrInsertDefault()
+		shepard.None[int]().Mut().GetOrInsertDefault()
 	}
 }
 
 func BenchmarkOption_GetOrInsertDefaultCustomType(b *testing.B) {
 	for n := 0; n < b.N; n++ {
-		shepard.None[testutils.TestType]().GetOrInsertDefault()
+		shepard.None[testutils.TestType]().Mut().GetOrInsertDefault()
 	}
 }
 
 func BenchmarkOption_GetOrInsertWith(b *testing.B) {
 	for n := 0; n < b.N; n++ {
-		shepard.None[int]().GetOrInsertWith(func() int { return n })
+		shepard.None[int]().Mut().GetOrInsertWith(func() int { return n })
 	}
 }
 
 func BenchmarkOption_GetOrInsertWithCustomType(b *testing.B) {
 	for n := 0; n < b.N; n++ {
-		shepard.None[testutils.TestType]().GetOrInsertWith(func() testutils.TestType { return testutils.TestType{Val: "test"} })
+		shepard.None[testutils.TestType]().Mut().GetOrInsertWith(func() testutils.TestType { return testutils.TestType{Val: "test"} })
 	}
 }

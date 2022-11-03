@@ -115,7 +115,7 @@ func TestResult_And(t *testing.T) {
 }
 
 func TestResult_AndThen(t *testing.T) {
-	sq := shepard.ResultAndThenFunc[int, string](func(val *int) *shepard.Result[int, string] {
+	sq := shepard.ResultAndThenFunc[int, string](func(val *int) shepard.Result[int, string] {
 		*val = *val * *val
 		return shepard.Ok[int, string](*val)
 	})
@@ -143,10 +143,10 @@ func TestResult_Or(t *testing.T) {
 }
 
 func TestResult_OrElse(t *testing.T) {
-	sq := shepard.ResultOrElseFunc[int, int](func(val int) *shepard.Result[int, int] {
+	sq := shepard.ResultOrElseFunc[int, int](func(val int) shepard.Result[int, int] {
 		return shepard.Ok[int, int](val * val)
 	})
-	err := shepard.ResultOrElseFunc[int, int](func(val int) *shepard.Result[int, int] {
+	err := shepard.ResultOrElseFunc[int, int](func(val int) shepard.Result[int, int] {
 		return shepard.Err[int, int](val)
 	})
 
