@@ -64,7 +64,8 @@ func TestOption_UnwrapOrDefault(t *testing.T) {
 
 	assert.Equal(t, "1909", year.UnwrapOrDefault())
 	assert.Equal(t, "", badYear.UnwrapOrDefault())
-	assert.Equal(t, "test", shepard.None[testutils.TestType]().Mut().GetOrInsertDefault().Val)
+	opt := shepard.None[testutils.TestType]()
+	assert.Equal(t, "test", opt.GetOrInsertDefault().Val)
 }
 
 func TestOption_OkOr(t *testing.T) {
@@ -263,24 +264,28 @@ func BenchmarkOption_UnwrapCustomType(b *testing.B) {
 
 func BenchmarkOption_GetOrInsertDefault(b *testing.B) {
 	for n := 0; n < b.N; n++ {
-		shepard.None[int]().Mut().GetOrInsertDefault()
+		bla := shepard.None[int]()
+		bla.GetOrInsertDefault()
 	}
 }
 
 func BenchmarkOption_GetOrInsertDefaultCustomType(b *testing.B) {
 	for n := 0; n < b.N; n++ {
-		shepard.None[testutils.TestType]().Mut().GetOrInsertDefault()
+		opt := shepard.None[testutils.TestType]()
+		opt.GetOrInsertDefault()
 	}
 }
 
 func BenchmarkOption_GetOrInsertWith(b *testing.B) {
 	for n := 0; n < b.N; n++ {
-		shepard.None[int]().Mut().GetOrInsertWith(func() int { return n })
+		opt := shepard.None[int]()
+		opt.GetOrInsertWith(func() int { return n })
 	}
 }
 
 func BenchmarkOption_GetOrInsertWithCustomType(b *testing.B) {
 	for n := 0; n < b.N; n++ {
-		shepard.None[testutils.TestType]().Mut().GetOrInsertWith(func() testutils.TestType { return testutils.TestType{Val: "test"} })
+		opt := shepard.None[testutils.TestType]()
+		opt.GetOrInsertWith(func() testutils.TestType { return testutils.TestType{Val: "test"} })
 	}
 }

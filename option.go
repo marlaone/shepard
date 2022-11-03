@@ -166,10 +166,6 @@ func (o Option[T]) Xor(opt Option[T]) Option[T] {
 	return None[T]()
 }
 
-func (o Option[T]) Mut() *Option[T] {
-	return &o
-}
-
 // Insert inserts value into the option, then returns a mutable reference to it.
 //
 // If the option already contains a value, the old value is dropped.
