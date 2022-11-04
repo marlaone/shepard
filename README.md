@@ -25,3 +25,11 @@ Package with helper functions to map or check Result of two different types.
 ### [shepard_json](https://github.com/marlaone/shepard/tree/main/shepard_json)
 
 Package implements types to json.(Un-)Marshal Results or Options.
+
+### [iter](https://github.com/marlaone/shepard/tree/main/iter)
+
+Package implements a type safe generic Iterator for any slices.
+
+### [slice](https://github.com/marlaone/shepard/tree/main/slice)
+
+Package implements a type safe generic Slice for any types.
