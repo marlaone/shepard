@@ -115,9 +115,8 @@ func TestResult_And(t *testing.T) {
 }
 
 func TestResult_AndThen(t *testing.T) {
-	sq := shepard.ResultAndThenFunc[int, string](func(val *int) shepard.Result[int, string] {
-		*val = *val * *val
-		return shepard.Ok[int, string](*val)
+	sq := shepard.ResultAndThenFunc[int, string](func(val int) shepard.Result[int, string] {
+		return shepard.Ok[int, string](val * val)
 	})
 
 	assert.True(t, shepard.Ok[int, string](2).AndThen(sq).Equal(shepard.Ok[int, string](4)))

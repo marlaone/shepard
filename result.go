@@ -6,7 +6,7 @@ import (
 )
 
 type ResultUnwrapElseFunc[T any, E any] func(err E) T
-type ResultAndThenFunc[T any, E any] func(val *T) Result[T, E]
+type ResultAndThenFunc[T any, E any] func(val T) Result[T, E]
 type ResultOrElseFunc[T any, E any] func(val E) Result[T, E]
 
 // Result is a type that represents either success (Ok) or failure (Err)
@@ -122,7 +122,7 @@ func (r Result[T, E]) And(res Result[T, E]) Result[T, E] {
 // This function can be used for control flow based on Result values.
 func (r Result[T, E]) AndThen(op ResultAndThenFunc[T, E]) Result[T, E] {
 	if r.IsOk() {
-		return op(r.ok)
+		return op(*r.ok)
 	}
 	return r
 }
