@@ -107,12 +107,11 @@ func TestOption_And(t *testing.T) {
 }
 
 func TestOption_AndThen(t *testing.T) {
-	square := shepard.OptionAndThenFunc[int](func(val *int) shepard.Option[int] {
-		*val = *val * *val
-		return shepard.Some[int](*val)
+	square := shepard.OptionAndThenFunc[int](func(val int) shepard.Option[int] {
+		return shepard.Some[int](val * val)
 	})
 
-	fail := shepard.OptionAndThenFunc[int](func(val *int) shepard.Option[int] {
+	fail := shepard.OptionAndThenFunc[int](func(val int) shepard.Option[int] {
 		return shepard.None[int]()
 	})
 
@@ -287,5 +286,15 @@ func BenchmarkOption_GetOrInsertWithCustomType(b *testing.B) {
 	for n := 0; n < b.N; n++ {
 		opt := shepard.None[testutils.TestType]()
 		opt.GetOrInsertWith(func() testutils.TestType { return testutils.TestType{Val: "test"} })
+	}
+}
+
+func BenchmarkOption_Complex(b *testing.B) {
+	opt := shepard.None[int]()
+	for n := 0; n < b.N; n++ {
+		opt.GetOrInsertWith(func() int { return n })
+		opt = opt.Filter(func(v *int) bool { return *v == 100 })
+		opt.GetOrInsertDefault()
+		opt.Unwrap()
 	}
 }

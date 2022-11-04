@@ -8,7 +8,7 @@ import (
 
 type OptionUnwrapElseFunc[T any] func() T
 type OptionOkOrElseFunc[T any] func() T
-type OptionAndThenFunc[T any] func(val *T) Option[T]
+type OptionAndThenFunc[T any] func(val T) Option[T]
 type OptionFilterFunc[T any] func(val *T) bool
 type OptionOrElseFunc[T any] func() Option[T]
 type OptionGetOrInsertWithFunc[T any] func() T
@@ -115,7 +115,7 @@ func (o Option[T]) And(opt Option[T]) Option[T] {
 // Some languages call this operation flatmap.
 func (o Option[T]) AndThen(op OptionAndThenFunc[T]) Option[T] {
 	if o.IsSome() {
-		return op(o.v)
+		return op(*o.v)
 	}
 	return o
 }
