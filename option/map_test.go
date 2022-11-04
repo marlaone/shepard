@@ -3,6 +3,7 @@ package option_test
 import (
 	"github.com/marlaone/shepard"
 	"github.com/marlaone/shepard/option"
+	"github.com/marlaone/shepard/testutils"
 	"github.com/stretchr/testify/assert"
 	"strconv"
 	"testing"
@@ -12,6 +13,10 @@ func TestMap(t *testing.T) {
 	maybeSomeString := shepard.Some[string]("Hello, World!")
 	maybeSomeLen := option.Map[string, int](maybeSomeString, func(s string) int { return len(s) })
 	assert.True(t, maybeSomeLen.Equal(shepard.Some[int](13)))
+
+	probablyNoString := shepard.None[string]()
+	noString := option.Map[string, int](probablyNoString, func(s string) int { return len(s) })
+	assert.True(t, noString.Equal(shepard.None[int]()))
 }
 
 func TestMapOr(t *testing.T) {
@@ -38,6 +43,9 @@ func TestMapOrDefault(t *testing.T) {
 
 	y := shepard.None[string]()
 	assert.Equal(t, 0, option.MapOrDefault[string, int](y, func(v string) int { return len(v) }))
+
+	z := shepard.None[testutils.TestType]()
+	assert.Equal(t, "test", option.MapOrDefault(z, func(v testutils.TestType) testutils.TestType { return v }).Val)
 }
 
 func BenchmarkMap(b *testing.B) {

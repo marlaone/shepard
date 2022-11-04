@@ -1,6 +1,8 @@
 package option
 
-import "github.com/marlaone/shepard"
+import (
+	"github.com/marlaone/shepard"
+)
 
 type MapFunc[T any, U any] func(value T) U
 type MapElseFunc[U any] func() U
