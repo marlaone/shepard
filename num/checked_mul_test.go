@@ -29,4 +29,8 @@ func TestCheckedMul(t *testing.T) {
 	x5 := 2.2
 	y5 := 2.2
 	assert.True(t, num.CheckedMul(x5, y5).Equal(shepard.Some[float64](4.4)))
+
+	x6 := 5
+	y6 := 0
+	assert.True(t, num.CheckedMul(x6, y6).Equal(shepard.Some[int](0)))
 }

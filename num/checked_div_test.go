@@ -17,4 +17,9 @@ func TestCheckedDiv(t *testing.T) {
 	x2 := 4
 	y2 := 2
 	assert.True(t, num.CheckedDiv(x2, y2).Equal(shepard.Some(2)))
+
+	x3 := 4
+	y3 := 0
+	assert.True(t, num.CheckedDiv(x3, y3).Equal(shepard.None[int]()))
+
 }
