@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/marlaone/shepard"
 	"github.com/marlaone/shepard/result"
+	"github.com/marlaone/shepard/testutils"
 	"github.com/stretchr/testify/assert"
 	"strconv"
 	"testing"
@@ -13,6 +14,10 @@ func TestMap(t *testing.T) {
 	maybeSomeString := shepard.Ok[string, error]("Hello, World!")
 	maybeSomeLen := result.Map[string, int](maybeSomeString, func(s string) int { return len(s) })
 	assert.True(t, maybeSomeLen.Equal(shepard.Ok[int, error](13)))
+
+	probablyNoString := shepard.Err[string, string]("failed")
+	noString := result.Map[string, int](probablyNoString, func(s string) int { return len(s) })
+	assert.True(t, noString.Equal(shepard.Err[int, string]("failed")))
 }
 
 func TestMapOr(t *testing.T) {
@@ -39,6 +44,9 @@ func TestMapOrDefault(t *testing.T) {
 
 	y := shepard.Err[string]("failed")
 	assert.Equal(t, 0, result.MapOrDefault[string, int](y, func(v string) int { return len(v) }))
+
+	z := shepard.Err[testutils.TestType, string]("failed")
+	assert.Equal(t, "test", result.MapOrDefault(z, func(v testutils.TestType) testutils.TestType { return v }).Val)
 }
 
 func TestMapErr(t *testing.T) {
