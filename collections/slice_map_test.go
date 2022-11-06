@@ -10,5 +10,5 @@ import (
 func TestMap(t *testing.T) {
 	s := collections.Init(1, 2, 3)
 
-	assert.Equal(t, collections.Init("1", "2", "3"), collections.Collect(collections.Map[int, string](s, func(i int) string { return strconv.Itoa(i) })))
+	assert.Equal(t, collections.Init("1", "2", "3"), collections.CollectSlice(collections.MapSlice[int, string](s, func(i int) string { return strconv.Itoa(i) })))
 }
