@@ -36,12 +36,7 @@ func MapOrElse[T any, U any](opt shepard.Option[T], op MapElseFunc[U], f MapFunc
 // MapOrDefault returns the types default (if shepard.None), or applies a function to the contained value (if shepard.Some).
 func MapOrDefault[T any, U any](opt shepard.Option[T], f MapFunc[T, U]) U {
 	if opt.IsNone() {
-		var valType U
-		defaulter, ok := any(valType).(shepard.Default[U])
-		if ok {
-			return defaulter.Default()
-		}
-		return valType
+		return shepard.GetDefault[U]()
 	}
 	return f(opt.Unwrap())
 }

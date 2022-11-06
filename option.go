@@ -17,6 +17,10 @@ type Option[T any] struct {
 	v *T
 }
 
+func (o Option[T]) Default() Option[T] {
+	return None[T]()
+}
+
 func Some[T any](val T) Option[T] {
 	return Option[T]{
 		v: &val,
@@ -74,12 +78,7 @@ func (o Option[T]) UnwrapOrElse(elseFunc OptionUnwrapElseFunc[T]) T {
 // Consumes the self argument then, if Some, returns the contained value, otherwise if None, returns the default value for that type.
 func (o Option[T]) UnwrapOrDefault() T {
 	if o.IsNone() {
-		var valType T
-		defaulter, ok := any(valType).(Default[T])
-		if ok {
-			return defaulter.Default()
-		}
-		return valType
+		return GetDefault[T]()
 	}
 	return o.Unwrap()
 }
@@ -193,15 +192,8 @@ func (o *Option[T]) GetOrInsertDefault() *T {
 		return o.v
 	}
 
-	var valType T
-	defaulter, ok := any(valType).(Default[T])
-	if ok {
-		val := defaulter.Default()
-		o.v = &val
-	} else {
-		val := new(T)
-		o.v = val
-	}
+	defaultValue := GetDefault[T]()
+	o.v = &defaultValue
 
 	return o.v
 }

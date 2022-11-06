@@ -38,12 +38,7 @@ func MapOrElse[T any, U any, E any](res shepard.Result[T, E], op MapElseFunc[U],
 // MapOrDefault returns the types default (if shepard.Err), or applies a function to the contained value (if shepard.Ok).
 func MapOrDefault[T any, U any, E any](res shepard.Result[T, E], f MapFunc[T, U]) U {
 	if res.IsErr() {
-		var valType U
-		defaulter, ok := any(valType).(shepard.Default[U])
-		if ok {
-			return defaulter.Default()
-		}
-		return valType
+		return shepard.GetDefault[U]()
 	}
 	return f(res.Unwrap())
 }

@@ -66,12 +66,7 @@ func (r Result[T, E]) UnwrapOrElse(elseFunc ResultUnwrapElseFunc[T, E]) T {
 // Consumes the self argument then, if Ok, returns the contained value, otherwise if Err, returns the default value for that type.
 func (r Result[T, E]) UnwrapOrDefault() T {
 	if r.IsErr() {
-		var valType T
-		defaulter, ok := any(valType).(Default[T])
-		if ok {
-			return defaulter.Default()
-		}
-		return valType
+		return GetDefault[T]()
 	}
 	return r.Unwrap()
 }

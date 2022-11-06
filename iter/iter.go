@@ -96,3 +96,7 @@ func (i Iter[T]) Find(predicate FindFunc[T]) shepard.Option[T] {
 		}
 	}
 }
+
+func (i Iter[T]) Count() int {
+	return len(i.values)
+}
