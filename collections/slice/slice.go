@@ -1,4 +1,4 @@
-package collections
+package slice
 
 import (
 	"fmt"
@@ -87,7 +87,7 @@ func (s *Slice[T]) Remove(index int) T {
 // This method operates in place, visiting each element exactly once in the original order,
 // and preserves the order of the retained elements.
 func (s *Slice[T]) Retain(f RetainFunc[T]) {
-	*s = CollectSlice[T](s.Iter().Filter(iter.FilterFunc[T](f)))
+	*s = Collect[T](s.Iter().Filter(iter.FilterFunc[T](f)))
 }
 
 // Push appends an element to the back of a collection.
