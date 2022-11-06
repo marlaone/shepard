@@ -30,6 +30,6 @@ Package implements types to json.(Un-)Marshal Results or Options.
 
 Package implements a type safe generic Iterator for any slices.
 
-### [slice](https://github.com/marlaone/shepard/tree/main/slice)
+### [collections](https://github.com/marlaone/shepard/tree/main/collections)
 
-Package implements a type safe generic Slice for any types.
+Package implements a type safe generic collections for any types.

@@ -1,4 +1,4 @@
-package slice
+package collections
 
 import "github.com/marlaone/shepard/iter"
 
