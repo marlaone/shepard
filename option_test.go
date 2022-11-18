@@ -1,6 +1,7 @@
 package shepard_test
 
 import (
+	"errors"
 	"github.com/marlaone/shepard"
 	"github.com/marlaone/shepard/testutils"
 	"github.com/stretchr/testify/assert"
@@ -70,10 +71,10 @@ func TestOption_UnwrapOrDefault(t *testing.T) {
 
 func TestOption_OkOr(t *testing.T) {
 	x := shepard.Some("foo")
-	assert.True(t, x.OkOr("bar").Equal(shepard.Ok[string, string]("foo")))
+	assert.True(t, x.OkOr(errors.New("bar")).Equal(shepard.Ok[string, error]("foo")))
 
 	x2 := shepard.None[string]()
-	assert.True(t, x2.OkOr("bar").Equal(shepard.Err[string, string]("bar")))
+	assert.True(t, x2.OkOr(errors.New("bar")).Equal(shepard.Err[string, error](errors.New("bar"))))
 }
 
 func TestOption_OkOrElse(t *testing.T) {

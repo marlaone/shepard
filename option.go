@@ -86,11 +86,11 @@ func (o Option[T]) UnwrapOrDefault() T {
 // OkOr transforms the Option[T] into a Result[T, T], mapping Some(v) to Ok(v) and None to Err(err).
 //
 // Arguments passed to ok_or are eagerly evaluated; if you are passing the result of a function call, it is recommended to use OkOrElse, which is lazily evaluated.
-func (o Option[T]) OkOr(err string) Result[T, string] {
+func (o Option[T]) OkOr(err error) Result[T, error] {
 	if o.IsSome() {
-		return Ok[T, string](o.Unwrap())
+		return Ok[T, error](o.Unwrap())
 	}
-	return Err[T, string](err)
+	return Err[T, error](err)
 }
 
 // OkOrElse transforms the Option[T] into a Result[T, T], mapping Some(v) to Ok(v) and None to Err(err()).

@@ -1,6 +1,7 @@
 package result_test
 
 import (
+	"errors"
 	"github.com/marlaone/shepard"
 	"github.com/marlaone/shepard/num"
 	"github.com/marlaone/shepard/result"
@@ -28,10 +29,10 @@ func TestAnd(t *testing.T) {
 }
 
 func TestAndThen(t *testing.T) {
-	sqThenToString := result.AndThenFunc[int, string, string](func(x int) shepard.Result[string, string] {
-		return result.Map[int, string](num.CheckedMul(x, x).OkOr("failed"), func(sq int) string { return strconv.Itoa(sq) })
+	sqThenToString := result.AndThenFunc[int, string, error](func(x int) shepard.Result[string, error] {
+		return result.Map[int, string](num.CheckedMul(x, x).OkOr(errors.New("failed")), func(sq int) string { return strconv.Itoa(sq) })
 	})
 
-	assert.True(t, result.AndThen(shepard.Ok[int, string](2), sqThenToString).Equal(shepard.Ok[string, string]("4")))
-	assert.True(t, result.AndThen(shepard.Err[int, string]("failed"), sqThenToString).Equal(shepard.Err[string, string]("failed")))
+	assert.True(t, result.AndThen(shepard.Ok[int, error](2), sqThenToString).Equal(shepard.Ok[string, error]("4")))
+	assert.True(t, result.AndThen(shepard.Err[int, error](errors.New("failed")), sqThenToString).Equal(shepard.Err[string, error](errors.New("failed"))))
 }
