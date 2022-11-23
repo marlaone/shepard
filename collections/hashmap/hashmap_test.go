@@ -135,3 +135,28 @@ func TestHashMap_ContainsKey(t *testing.T) {
 	assert.True(t, m.ContainsKey(1))
 	assert.False(t, m.ContainsKey(2))
 }
+
+func BenchmarkHashMap_Get(b *testing.B) {
+	m := hashmap.New[int, int]()
+	for i := 0; i < b.N; i++ {
+		m.Insert(i, i)
+	}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		m.Get(i)
+	}
+}
+
+func BenchmarkGoMap(b *testing.B) {
+	m := map[int]int{}
+	for i := 0; i < b.N; i++ {
+		m[i] = i
+	}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		v, _ := m[i]
+		void(v)
+	}
+}
+
+func void(v int) {}
