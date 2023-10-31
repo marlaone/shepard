@@ -7,6 +7,7 @@ import (
 	"os/signal"
 	"runtime/pprof"
 
+	"github.com/marlaone/shepard"
 	"github.com/marlaone/shepard/http"
 )
 
@@ -30,7 +31,46 @@ func main() {
 		os.Exit(1)
 	}()
 
-	if err := http.Serve(":8080"); err != nil {
+	r := http.NewRouter()
+
+	r.Use(func(req *http.Request[http.RequestBody], next http.Next) shepard.Result[http.Response[http.Body], error] {
+		// remove trailing slash
+		if req.URL.Path != "/" && req.URL.Path[len(req.URL.Path)-1] == '/' {
+			req.URL.Path = req.URL.Path[:len(req.URL.Path)-1]
+		}
+		return next()
+	})
+
+	r.Use(func(req *http.Request[http.RequestBody], next http.Next) shepard.Result[http.Response[http.Body], error] {
+		req.URL.Query().Set("hello", "middleware")
+		return next()
+	})
+
+	r.Register(http.Get("/hello", func(req *http.Request[http.RequestBody]) http.Response[http.Body] {
+		res := http.NewResponseBuilder(http.NewHttpResponseBytes()).Status(200).Body(http.NewBytesBody()).Unwrap()
+
+		greetDefault := new(string)
+		*greetDefault = "world"
+		greet := req.URL.Query().Get("hello").First().UnwrapOr(greetDefault)
+
+		res.Body().Write() <- []byte("Hello " + *greet + "!")
+		res.Body().Finish()
+		return res
+	}))
+
+	r.Register(http.Get("/hello.json", func(req *http.Request[http.RequestBody]) http.Response[http.Body] {
+		greetDefault := new(string)
+		*greetDefault = "world"
+		greet := req.URL.Query().Get("hello").First().UnwrapOr(greetDefault)
+		res := http.JsonResponse(struct {
+			Hello string `json:"hello"`
+		}{
+			Hello: *greet,
+		})
+		return res
+	}))
+
+	if err := http.Serve(":8080", r); err != nil {
 		log.Fatal(err)
 	}
 }

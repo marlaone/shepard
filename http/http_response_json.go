@@ -18,7 +18,6 @@ func JsonResponse(body any) Response[Body] {
 	}
 	res := potentialRes.Unwrap()
 
-	res.SetHeader("Content-Type", "application/json")
 
 	bytes, err := json.Marshal(body)
 	if err != nil {

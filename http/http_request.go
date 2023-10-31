@@ -1,40 +1,32 @@
 package http
 
 import (
+	"context"
 	"io"
 
 	"github.com/marlaone/shepard"
-	"github.com/marlaone/shepard/collections/hashmap"
 )
 
 type RequestBody io.Reader
 
-type RequestHead struct {
-	Method  Method
-	URI     URI
-	Version Version
-	Headers hashmap.HashMap[string, []string]
-}
-
-func (r RequestHead) Default() RequestHead {
-	return RequestHead{
-		Method:  r.Method.Default(),
-		URI:     r.URI.Default(),
-		Version: r.Version.Default(),
-		Headers: hashmap.WithCapacity[string, []string](16),
-	}
-}
-
 type Request[T RequestBody] struct {
-	head RequestHead
-	body T
+	Context context.Context
+	Method  Method
+	URL     URL
+	Version Version
+	Headers Headers
+	body    T
 }
 
 func (r Request[T]) Default() Request[T] {
 	var body T
 	return Request[T]{
-		head: RequestHead{}.Default(),
-		body: body,
+		Context: context.Background(),
+		Method:  r.Method.Default(),
+		URL:     r.URL.Default(),
+		Version: r.Version.Default(),
+		Headers: r.Headers.Default(),
+		body:    body,
 	}
 }
 
@@ -49,30 +41,23 @@ func NewRequestBuilder[T RequestBody]() *RequestBuilder[T] {
 }
 
 func (r *RequestBuilder[T]) Method(method Method) *RequestBuilder[T] {
-	r.request.head.Method = method
+	r.request.Method = method
 	return r
 }
 
-func (r *RequestBuilder[T]) URI(uri URI) *RequestBuilder[T] {
-	r.request.head.URI = uri
+func (r *RequestBuilder[T]) URL(url URL) *RequestBuilder[T] {
+	r.request.URL = url
 	return r
 }
 
 func (r *RequestBuilder[T]) Version(version Version) *RequestBuilder[T] {
-	r.request.head.Version = version
+	r.request.Version = version
 	return r
 }
 
 func (r *RequestBuilder[T]) Header(key string, values ...string) *RequestBuilder[T] {
-	header := r.request.head.Headers
 
-	if header.ContainsKey(key) {
-		header.Entry(key).AndModify(func(s *[]string) {
-			*s = append(*s, values...)
-		})
-	} else {
-		header.Insert(key, values)
-	}
+	r.request.Headers.Set(key, values...)
 
 	return r
 }

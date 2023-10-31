@@ -70,8 +70,9 @@ func (m HashMap[K, V]) ValuesMut() iter.Iter[*V] {
 func (m HashMap[K, V]) Iter() iter.Iter[Pair[*K, *V]] {
 	var values []Pair[*K, *V]
 	for i, k := range m.keys {
+		k := &k
 		v := m.values[i]
-		values = append(values, Pair[*K, *V]{Key: &k, Value: v.OrDefault()})
+		values = append(values, Pair[*K, *V]{Key: k, Value: v.OrDefault()})
 	}
 	return iter.New(values)
 }

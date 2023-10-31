@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"strings"
 
 	"github.com/marlaone/shepard"
+	"github.com/marlaone/shepard/num"
 )
 
 var headerKeySeparator = []byte{':'}
@@ -43,11 +45,18 @@ func RequestFromConnection(conn net.Conn) shepard.Result[Request[RequestBody], e
 	}
 
 	// read path
-	// TODO: parse path
-	_, err = buffer.ReadBytes(' ')
+	path, err := buffer.ReadBytes(' ')
 	if err != nil {
 		return shepard.Err[Request[RequestBody], error](fmt.Errorf("[http.RequestFromConnection] read path failed: %w", err))
 	}
+	path = path[:len(path)-1]
+
+	urlRes := ParseRequestURI(string(path))
+	if urlRes.IsErr() {
+		return shepard.Err[Request[RequestBody], error](fmt.Errorf("[http.RequestFromConnection] parse url failed: %w", urlRes.Err().Unwrap()))
+	}
+
+	url, _ := urlRes.AsMut()
 
 	// read protocol
 	protocol, err := buffer.ReadBytes('\n')
@@ -57,7 +66,7 @@ func RequestFromConnection(conn net.Conn) shepard.Result[Request[RequestBody], e
 	protocol = bytes.TrimSpace(protocol)
 
 	// create request builder
-	builder := NewRequestBuilder[RequestBody]().Method(method.Unwrap()).Version(Version(protocol))
+	builder := NewRequestBuilder[RequestBody]().Method(method.Unwrap()).Version(Version(protocol)).URL(*url)
 
 	// read headers
 	for {
@@ -82,6 +91,7 @@ func RequestFromConnection(conn net.Conn) shepard.Result[Request[RequestBody], e
 			}
 			return shepard.Err[Request[RequestBody], error](fmt.Errorf("[http.RequestFromConnection] read header key failed: %w", err))
 		}
+		key = key[:len(key)-1]
 
 		// read header value
 		headerValue, err := linesBuffer.ReadBytes('\n')
@@ -98,6 +108,29 @@ func RequestFromConnection(conn net.Conn) shepard.Result[Request[RequestBody], e
 
 		// add header to request
 		builder.Header(string(bytes.TrimSpace(key)), values...)
+	}
+
+	var host shepard.Option[*string]
+
+	if builder.request.Headers.Has("X-Forwarded-Host") {
+		host = builder.request.Headers.Get("X-Forwarded-Host").First()
+	} else if builder.request.Headers.Has("Host") {
+		host = builder.request.Headers.Get("Host").First()
+	}
+
+	if host.IsSome() {
+		hostValues := *host.Unwrap()
+		host := hostValues
+
+		host, port, _ := strings.Cut(host, ":")
+
+		n := num.ParseString[uint16](port)
+		if n.IsErr() {
+			return shepard.Err[Request[RequestBody], error](fmt.Errorf("[http.RequestFromConnection] parse port failed: %w", n.Err().Unwrap()))
+		}
+
+		builder.request.URL.Host = host
+		builder.request.URL.Port = n.Unwrap()
 	}
 
 	// add remaining bytes from buffer to request body and return request
