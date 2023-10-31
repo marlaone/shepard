@@ -1,11 +1,12 @@
 package hashmap_test
 
 import (
+	"testing"
+
 	"github.com/marlaone/shepard"
 	"github.com/marlaone/shepard/collections/hashmap"
 	"github.com/marlaone/shepard/iter"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func TestHashMap_Capacity(t *testing.T) {

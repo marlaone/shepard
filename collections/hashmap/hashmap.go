@@ -92,14 +92,25 @@ func (m *HashMap[K, V]) Clear() {
 	m.keys = make([]K, 0)
 }
 
+// keyIndex returns the index of the given key and true if the key is present in the map.
 func (m HashMap[K, V]) keyIndex(key K) (int, bool) {
-	for i, j := 0, m.Len()-1; i < m.Len() && j >= 0; i, j = i+1, j-1 {
-		if m.keys[i] == key {
-			return i, true
-		} else if m.keys[j] == key {
-			return j, true
+
+	// binary search
+	low := 0
+	high := m.Len()
+	for low < high {
+		mid := (low + high) / 2
+		if m.keys[mid] < key {
+			low = mid + 1
+		} else {
+			high = mid
 		}
 	}
+
+	if low < m.Len() && m.keys[low] == key {
+		return low, true
+	}
+
 	return 0, false
 }
 
@@ -108,8 +119,7 @@ func (m *HashMap[K, V]) Entry(key K) *Entry[K, V] {
 	i, ok := m.keyIndex(key)
 	if !ok {
 		e := Vacant[K, V](&key)
-		m.values = append(m.values, &e)
-		m.keys = append(m.keys, key)
+		m.insertEntry(key, &e)
 		return &e
 	}
 	e := m.values[i]
@@ -138,6 +148,28 @@ func (m HashMap[K, V]) ContainsKey(k K) bool {
 	return m.Entry(k).IsOccupied()
 }
 
+// insertEntry inserts an entry into the map and sorts the keys in ascending order.
+func (m *HashMap[K, V]) insertEntry(k K, e *Entry[K, V]) {
+	low := 0
+	high := m.Len()
+	for low < high {
+		mid := (low + high) / 2
+		if m.keys[mid] < k {
+			low = mid + 1
+		} else {
+			high = mid
+		}
+	}
+
+	m.values = append(m.values, nil)
+	copy(m.values[low+1:], m.values[low:])
+	m.values[low] = e
+
+	m.keys = append(m.keys, k)
+	copy(m.keys[low+1:], m.keys[low:])
+	m.keys[low] = k
+}
+
 // Insert inserts a key-value pair into the map.
 //
 // If the map did not have this key present, shepard.None is returned.
@@ -151,8 +183,7 @@ func (m *HashMap[K, V]) Insert(k K, v V) shepard.Option[V] {
 		m.values[i] = &e
 		return shepard.Some(*e.OrDefault())
 	} else {
-		m.values = append(m.values, &e)
-		m.keys = append(m.keys, k)
+		m.insertEntry(k, &e)
 	}
 	return shepard.None[V]()
 }
