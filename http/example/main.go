@@ -46,6 +46,26 @@ func main() {
 		return next()
 	})
 
+	r.Register(http.Post("/", func(req *http.Request[http.RequestBody]) http.Response[http.Body] {
+		parseRes := req.ParseForm()
+		if parseRes.IsErr() {
+			errRes := http.NewResponseBuilder(http.NewHttpResponseBytes()).Status(http.StatusCodeInternalServerError).Body(http.NewBytesBody()).Unwrap()
+			errRes.Body().Write() <- []byte(parseRes.Err().Unwrap().Error())
+			errRes.Body().Finish()
+			return errRes
+		}
+
+		greet := "world"
+		if req.Params().Has("hello") {
+			greet = *req.Params().Get("hello").First().Unwrap()
+		}
+
+		res := http.NewResponseBuilder(http.NewHttpResponseBytes()).Status(200).Body(http.NewBytesBody()).Unwrap()
+		res.Body().Write() <- []byte("Hello " + greet + "!")
+		res.Body().Finish()
+		return res
+	}))
+
 	r.Register(http.Get("/hello", func(req *http.Request[http.RequestBody]) http.Response[http.Body] {
 		res := http.NewResponseBuilder(http.NewHttpResponseBytes()).Status(200).Body(http.NewBytesBody()).Unwrap()
 

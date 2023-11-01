@@ -33,3 +33,7 @@ Package implements a type safe generic Iterator for any slices.
 ### [collections](https://github.com/marlaone/shepard/tree/main/collections)
 
 Package implements a type safe generic collections for any types.
+
+### [http](https://github.com/marlaone/shepard/tree/main/http)
+
+Package implements a type safe http server with router and middlewares.
