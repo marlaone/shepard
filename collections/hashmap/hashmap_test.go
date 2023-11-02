@@ -1,11 +1,12 @@
 package hashmap_test
 
 import (
+	"testing"
+
 	"github.com/marlaone/shepard"
 	"github.com/marlaone/shepard/collections/hashmap"
 	"github.com/marlaone/shepard/iter"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func TestHashMap_Capacity(t *testing.T) {
@@ -27,10 +28,12 @@ func TestHashMap_Values(t *testing.T) {
 
 func TestHashMap_ValuesMut(t *testing.T) {
 	m := hashmap.From[string, int]([]hashmap.Pair[string, int]{{"a", 1}, {"b", 2}, {"c", 3}})
-	one := 1
-	two := 2
-	three := 3
-	assert.EqualValues(t, iter.New[*int]([]*int{&one, &two, &three}), m.ValuesMut())
+
+	m.ValuesMut().Foreach(func(_ int, value *int) {
+		*value = *value * 2
+	})
+
+	assert.EqualValues(t, iter.New[int]([]int{2, 4, 6}), m.Values())
 }
 
 func TestHashMap_Iter(t *testing.T) {
@@ -137,7 +140,7 @@ func TestHashMap_ContainsKey(t *testing.T) {
 }
 
 func BenchmarkHashMap_Get(b *testing.B) {
-	m := hashmap.New[int, int]()
+	m := hashmap.WithCapacity[int, int](b.N)
 	for i := 0; i < b.N; i++ {
 		m.Insert(i, i)
 	}
@@ -145,10 +148,11 @@ func BenchmarkHashMap_Get(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		m.Get(i)
 	}
+	b.ReportAllocs()
 }
 
 func BenchmarkGoMap(b *testing.B) {
-	m := map[int]int{}
+	m := make(map[int]int, b.N)
 	for i := 0; i < b.N; i++ {
 		m[i] = i
 	}
@@ -157,6 +161,7 @@ func BenchmarkGoMap(b *testing.B) {
 		v, _ := m[i]
 		void(v)
 	}
+	b.ReportAllocs()
 }
 
 func void(v int) {}

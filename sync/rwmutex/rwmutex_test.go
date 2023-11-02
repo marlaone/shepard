@@ -1,4 +1,4 @@
-package mutex_test
+package rwmutex_test
 
 import (
 	"runtime"
