@@ -19,18 +19,20 @@ func NewRouter() *Router {
 		middleware: slice.New[Middleware](),
 		notFoundHandler: func(req *Request[RequestBody]) Response[Body] {
 			res := NewResponseBuilder(NewHttpResponseBytes()).Status(404).Body(NewBytesBody()).Unwrap()
-			res.Body().Finish()
+			res.Body().Close()
 			return res
 		},
 	}
 }
 
-func (r *Router) Use(middleware Middleware) {
+func (r *Router) Use(middleware Middleware) *Router {
 	r.middleware.Push(middleware)
+	return r
 }
 
-func (r *Router) Register(route Route) {
+func (r *Router) Route(route Route) *Router {
 	r.routes.Push(route)
+	return r
 }
 
 func (r *Router) NotFound(handler Handler) {
@@ -48,7 +50,7 @@ func (r *Router) Serve(req *Request[RequestBody]) shepard.Result[Response[Body],
 		}
 		if route.Unwrap().Method != req.Method {
 			res := NewResponseBuilder(NewHttpResponseBytes()).Status(405).Body(NewBytesBody()).Unwrap()
-			res.Body().Finish()
+			res.Body().Close()
 			return shepard.Ok[Response[Body], error](res)
 		}
 		return shepard.Ok[Response[Body], error](route.Unwrap().Handler(req))

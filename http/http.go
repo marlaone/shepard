@@ -62,8 +62,23 @@ func Serve(addr string, r *Router) error {
 				conn.Write([]byte(*value.Key + ": " + headerValues + "\r\n"))
 			})
 			conn.Write([]byte("\r\n"))
-			for data := range res.Body().Read() {
+			buf := slice.New[byte]()
+			for {
+				res.Body().Read(&buf)
+
+				iter := buf.Iter()
+				next := iter.Next()
+				data := make([]byte, 0, buf.Len())
+				for next.IsSome() {
+					data = append(data, next.Unwrap())
+					next = iter.Next()
+				}
+
 				conn.Write(data)
+
+				if res.Body().Closed() {
+					break
+				}
 			}
 			conn.Close()
 		}(conn)

@@ -49,7 +49,7 @@ func (r *HttpResponseBytes) SetBody(body Body) {
 }
 
 func (r *HttpResponseBytes) Finish() {
-	r.body.Finish()
+	r.body.Close()
 }
 
 func (r *HttpResponseBytes) Body() Body {

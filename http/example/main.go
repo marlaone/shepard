@@ -8,12 +8,14 @@ import (
 	"runtime/pprof"
 
 	"github.com/marlaone/shepard"
-	"github.com/marlaone/shepard/http"
+	"github.com/marlaone/shepard/collections/slice"
+	. "github.com/marlaone/shepard/http"
 )
 
 var cpuprofile = flag.String("cpuprofile", "", "write cpu profile to file")
 
 func main() {
+
 	flag.Parse()
 	if *cpuprofile != "" {
 		f, err := os.Create(*cpuprofile)
@@ -31,66 +33,62 @@ func main() {
 		os.Exit(1)
 	}()
 
-	r := http.NewRouter()
+	r := NewRouter().
+		Use(func(req *Request[RequestBody], next Next) shepard.Result[Response[Body], error] {
+			// remove trailing slash
+			if req.URL.Path != "/" && req.URL.Path[len(req.URL.Path)-1] == '/' {
+				req.URL.Path = req.URL.Path[:len(req.URL.Path)-1]
+			}
+			return next()
+		}).
+		Use(func(req *Request[RequestBody], next Next) shepard.Result[Response[Body], error] {
+			req.URL.Query().Set("hello", "middleware")
+			return next()
+		}).
+		Route(Post("/", func(req *Request[RequestBody]) Response[Body] {
+			parseRes := req.ParseForm()
+			if parseRes.IsErr() {
+				errRes := NewResponseBuilder(NewHttpResponseBytes()).Status(StatusCodeInternalServerError).Body(NewBytesBody()).Unwrap()
+				errRes.Body().Write(slice.Init[byte]([]byte(parseRes.Err().Unwrap().Error())...))
+				errRes.Body().Close()
 
-	r.Use(func(req *http.Request[http.RequestBody], next http.Next) shepard.Result[http.Response[http.Body], error] {
-		// remove trailing slash
-		if req.URL.Path != "/" && req.URL.Path[len(req.URL.Path)-1] == '/' {
-			req.URL.Path = req.URL.Path[:len(req.URL.Path)-1]
-		}
-		return next()
-	})
+				return errRes
+			}
 
-	r.Use(func(req *http.Request[http.RequestBody], next http.Next) shepard.Result[http.Response[http.Body], error] {
-		req.URL.Query().Set("hello", "middleware")
-		return next()
-	})
+			greet := "world"
+			if req.Params().Has("hello") {
+				greet = *req.Params().Get("hello").First().Unwrap()
+			}
 
-	r.Register(http.Post("/", func(req *http.Request[http.RequestBody]) http.Response[http.Body] {
-		parseRes := req.ParseForm()
-		if parseRes.IsErr() {
-			errRes := http.NewResponseBuilder(http.NewHttpResponseBytes()).Status(http.StatusCodeInternalServerError).Body(http.NewBytesBody()).Unwrap()
-			errRes.Body().Write() <- []byte(parseRes.Err().Unwrap().Error())
-			errRes.Body().Finish()
-			return errRes
-		}
+			res := NewResponseBuilder(NewHttpResponseBytes()).Status(200).Body(NewBytesBody()).Unwrap()
+			res.Body().Write(slice.Init[byte]([]byte("Hello " + greet + "!")...))
+			res.Body().Close()
+			return res
+		})).
+		Route(Get("/hello", func(req *Request[RequestBody]) Response[Body] {
+			res := NewResponseBuilder(NewHttpResponseBytes()).Status(200).Body(NewBytesBody()).Unwrap()
 
-		greet := "world"
-		if req.Params().Has("hello") {
-			greet = *req.Params().Get("hello").First().Unwrap()
-		}
+			greetDefault := new(string)
+			*greetDefault = "world"
+			greet := req.URL.Query().Get("hello").First().UnwrapOr(greetDefault)
 
-		res := http.NewResponseBuilder(http.NewHttpResponseBytes()).Status(200).Body(http.NewBytesBody()).Unwrap()
-		res.Body().Write() <- []byte("Hello " + greet + "!")
-		res.Body().Finish()
-		return res
-	}))
+			res.Body().Write(slice.Init[byte]([]byte("Hello " + *greet + "!")...))
+			res.Body().Close()
+			return res
+		})).
+		Route(Get("/hello.json", func(req *Request[RequestBody]) Response[Body] {
+			greetDefault := new(string)
+			*greetDefault = "world"
+			greet := req.URL.Query().Get("hello").First().UnwrapOr(greetDefault)
+			res := JsonResponse(struct {
+				Hello string `json:"hello"`
+			}{
+				Hello: *greet,
+			})
+			return res
+		}))
 
-	r.Register(http.Get("/hello", func(req *http.Request[http.RequestBody]) http.Response[http.Body] {
-		res := http.NewResponseBuilder(http.NewHttpResponseBytes()).Status(200).Body(http.NewBytesBody()).Unwrap()
-
-		greetDefault := new(string)
-		*greetDefault = "world"
-		greet := req.URL.Query().Get("hello").First().UnwrapOr(greetDefault)
-
-		res.Body().Write() <- []byte("Hello " + *greet + "!")
-		res.Body().Finish()
-		return res
-	}))
-
-	r.Register(http.Get("/hello.json", func(req *http.Request[http.RequestBody]) http.Response[http.Body] {
-		greetDefault := new(string)
-		*greetDefault = "world"
-		greet := req.URL.Query().Get("hello").First().UnwrapOr(greetDefault)
-		res := http.JsonResponse(struct {
-			Hello string `json:"hello"`
-		}{
-			Hello: *greet,
-		})
-		return res
-	}))
-
-	if err := http.Serve(":8080", r); err != nil {
+	if err := Serve(":8080", r); err != nil {
 		log.Fatal(err)
 	}
 }

@@ -5,6 +5,7 @@ import (
 	"github.com/marlaone/shepard/collections/hashmap"
 	"github.com/marlaone/shepard/collections/slice"
 	"github.com/marlaone/shepard/iter"
+	"github.com/marlaone/shepard/sync/io"
 )
 
 // header parts
@@ -38,9 +39,8 @@ func (r ResponseHead) Default() ResponseHead {
 // response
 
 type Body interface {
-	Write() chan<- []byte
-	Read() <-chan []byte
-	Finish()
+	io.ReaderWriterCloser
+	Closed() bool
 }
 
 type Headers struct {

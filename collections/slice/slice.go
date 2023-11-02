@@ -2,6 +2,7 @@ package slice
 
 import (
 	"fmt"
+
 	"github.com/marlaone/shepard"
 	"github.com/marlaone/shepard/iter"
 )
@@ -181,4 +182,8 @@ func (s *Slice[T]) Reverse() {
 // The iterator yields all items from start to end.
 func (s Slice[T]) Iter() iter.Iter[T] {
 	return iter.New(s.values)
+}
+
+func (s *Slice[T]) Copy(dest *Slice[T]) int {
+	return copy(dest.values, s.values)
 }

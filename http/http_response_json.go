@@ -2,6 +2,8 @@ package http
 
 import (
 	"encoding/json"
+
+	"github.com/marlaone/shepard/collections/slice"
 )
 
 func JsonResponse(body any) Response[Body] {
@@ -12,23 +14,23 @@ func JsonResponse(body any) Response[Body] {
 		errRes := NewHttpResponseBytes()
 		errRes.SetStatusCode(StatusCodeInternalServerError)
 		errRes.SetBody(NewBytesBody())
-		errRes.Body().Write() <- []byte(potentialRes.Err().Unwrap().Error())
-		errRes.Body().Finish()
+		errRes.Body().Write(slice.Init[byte]([]byte(potentialRes.Err().Unwrap().Error())...))
+		errRes.Finish()
 		return errRes
 	}
 	res := potentialRes.Unwrap()
 
-
 	bytes, err := json.Marshal(body)
 	if err != nil {
 		res.SetStatusCode(StatusCodeInternalServerError)
-		res.Body().Write() <- []byte(err.Error())
+		res.Body().Write(slice.Init[byte]([]byte(err.Error())...))
+		res.Finish()
 		return res
 	}
 
 	res.SetStatusCode(StatusCodeOk)
-	res.Body().Write() <- bytes
-	res.Body().Finish()
+	res.Body().Write(slice.Init[byte](bytes...))
+	res.Finish()
 
 	return res
 }
