@@ -28,10 +28,12 @@ func TestHashMap_Values(t *testing.T) {
 
 func TestHashMap_ValuesMut(t *testing.T) {
 	m := hashmap.From[string, int]([]hashmap.Pair[string, int]{{"a", 1}, {"b", 2}, {"c", 3}})
-	one := 1
-	two := 2
-	three := 3
-	assert.EqualValues(t, iter.New[*int]([]*int{&one, &two, &three}), m.ValuesMut())
+
+	m.ValuesMut().Foreach(func(_ int, value *int) {
+		*value = *value * 2
+	})
+
+	assert.EqualValues(t, iter.New[int]([]int{2, 4, 6}), m.Values())
 }
 
 func TestHashMap_Iter(t *testing.T) {
