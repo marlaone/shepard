@@ -138,7 +138,7 @@ func TestHashMap_ContainsKey(t *testing.T) {
 }
 
 func BenchmarkHashMap_Get(b *testing.B) {
-	m := hashmap.New[int, int]()
+	m := hashmap.WithCapacity[int, int](b.N)
 	for i := 0; i < b.N; i++ {
 		m.Insert(i, i)
 	}
@@ -146,10 +146,11 @@ func BenchmarkHashMap_Get(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		m.Get(i)
 	}
+	b.ReportAllocs()
 }
 
 func BenchmarkGoMap(b *testing.B) {
-	m := map[int]int{}
+	m := make(map[int]int, b.N)
 	for i := 0; i < b.N; i++ {
 		m[i] = i
 	}
@@ -158,6 +159,7 @@ func BenchmarkGoMap(b *testing.B) {
 		v, _ := m[i]
 		void(v)
 	}
+	b.ReportAllocs()
 }
 
 func void(v int) {}

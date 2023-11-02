@@ -9,31 +9,28 @@ type EntryOrInsertWithKeyFunc[K comparable, V any] func(*K) V
 type EntryAndModifyFunc[V any] func(*V)
 
 type Entry[K comparable, V any] struct {
-	key      *K
-	value    *V
-	occupied bool
+	key   *K
+	value *V
 }
 
 // Occupied is an occupied entry.
 func Occupied[K comparable, V any](k *K, v *V) Entry[K, V] {
 	return Entry[K, V]{
-		key:      k,
-		value:    v,
-		occupied: true,
+		key:   k,
+		value: v,
 	}
 }
 
 // Vacant is a vacant entry.
 func Vacant[K comparable, V any](k *K) Entry[K, V] {
 	return Entry[K, V]{
-		key:      k,
-		value:    nil,
-		occupied: false,
+		key:   k,
+		value: nil,
 	}
 }
 
 func (e Entry[K, V]) IsOccupied() bool {
-	return e.occupied
+	return e.value != nil
 }
 
 // OrInsert ensures a value is in the entry by inserting the default if empty, and returns a mutable reference to the value in the entry.
@@ -42,7 +39,6 @@ func (e *Entry[K, V]) OrInsert(defaultValue V) *V {
 		return e.value
 	}
 	e.value = &defaultValue
-	e.occupied = true
 	return e.value
 }
 
@@ -53,7 +49,6 @@ func (e *Entry[K, V]) OrInsertWith(f EntryOrInsertWithFunc[V]) *V {
 	}
 	defaultValue := f()
 	e.value = &defaultValue
-	e.occupied = true
 	return e.value
 }
 
@@ -67,7 +62,6 @@ func (e *Entry[K, V]) OrInsertWithKey(f EntryOrInsertWithKeyFunc[K, V]) *V {
 	}
 	defaultValue := f(e.key)
 	e.value = &defaultValue
-	e.occupied = true
 	return e.value
 }
 
@@ -96,6 +90,5 @@ func (e *Entry[K, V]) OrDefault() *V {
 	}
 	defaultValue := shepard.GetDefault[V]()
 	e.value = &defaultValue
-	e.occupied = true
 	return e.value
 }

@@ -59,7 +59,7 @@ func (m HashMap[K, V]) Values() iter.Iter[V] {
 
 // ValuesMut returns an iter.Iter[*V] visiting all values mutably in arbitrary order.
 func (m HashMap[K, V]) ValuesMut() iter.Iter[*V] {
-	var values []*V
+	values := make([]*V, 0, len(m.values))
 	for _, e := range m.values {
 		values = append(values, e.OrDefault())
 	}
@@ -68,7 +68,7 @@ func (m HashMap[K, V]) ValuesMut() iter.Iter[*V] {
 
 // Iter returns an iter.Iter[Pair[*K, *V]] visiting all key-value pairs in arbitrary order.
 func (m HashMap[K, V]) Iter() iter.Iter[Pair[*K, *V]] {
-	var values []Pair[*K, *V]
+	values := make([]Pair[*K, *V], 0, len(m.keys))
 	for i, k := range m.keys {
 		k := &k
 		v := m.values[i]
@@ -89,8 +89,8 @@ func (m HashMap[K, V]) IsEmpty() bool {
 
 // Clear clears the map, removing all key-value pairs. Keeps the allocated memory for reuse.
 func (m *HashMap[K, V]) Clear() {
-	m.values = make([]*Entry[K, V], 0)
-	m.keys = make([]K, 0)
+	m.values = m.values[:0]
+	m.keys = m.keys[:0]
 }
 
 // keyIndex returns the index of the given key and true if the key is present in the map.
