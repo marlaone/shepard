@@ -1,7 +1,9 @@
 package shepard_test
 
 import (
+	"errors"
 	"github.com/marlaone/shepard"
+	"github.com/marlaone/shepard/testutils"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
@@ -185,4 +187,277 @@ func TestResult_AsMut(t *testing.T) {
 	ok, _ := res.AsMut()
 	*ok = 7
 	assert.Equal(t, 7, res.Unwrap())
+}
+
+// ============================================================================
+// Comparison Benchmarks: Result[T, E] vs Native Go (value, error) Pattern
+// ============================================================================
+
+// --- Ok/Unwrap vs Value Check ---
+
+func BenchmarkResult_OkUnwrap_Int(b *testing.B) {
+	b.ReportAllocs()
+	for n := 0; n < b.N; n++ {
+		res := shepard.Ok[int, string](n)
+		_ = res.Unwrap()
+	}
+}
+
+func BenchmarkNative_ValueCheck_Int(b *testing.B) {
+	b.ReportAllocs()
+	getValue := func(n int) (int, error) {
+		return n, nil
+	}
+	for n := 0; n < b.N; n++ {
+		val, err := getValue(n)
+		if err != nil {
+			panic(err)
+		}
+		_ = val
+	}
+}
+
+func BenchmarkResult_OkUnwrap_CustomType(b *testing.B) {
+	b.ReportAllocs()
+	for n := 0; n < b.N; n++ {
+		res := shepard.Ok[testutils.TestType, string](testutils.TestType{Val: "test"})
+		_ = res.Unwrap()
+	}
+}
+
+func BenchmarkNative_ValueCheck_CustomType(b *testing.B) {
+	b.ReportAllocs()
+	getValue := func() (testutils.TestType, error) {
+		return testutils.TestType{Val: "test"}, nil
+	}
+	for n := 0; n < b.N; n++ {
+		val, err := getValue()
+		if err != nil {
+			panic(err)
+		}
+		_ = val
+	}
+}
+
+// --- Err Creation ---
+
+func BenchmarkResult_ErrCreation_Int(b *testing.B) {
+	b.ReportAllocs()
+	for n := 0; n < b.N; n++ {
+		res := shepard.Err[int, string]("error")
+		_ = res.IsErr()
+	}
+}
+
+func BenchmarkNative_ErrorCreation_Int(b *testing.B) {
+	b.ReportAllocs()
+	for n := 0; n < b.N; n++ {
+		err := errors.New("error")
+		_ = err != nil
+	}
+}
+
+// --- UnwrapOr vs Error Fallback ---
+
+func BenchmarkResult_UnwrapOr_Ok_Int(b *testing.B) {
+	b.ReportAllocs()
+	for n := 0; n < b.N; n++ {
+		res := shepard.Ok[int, string](n)
+		_ = res.UnwrapOr(0)
+	}
+}
+
+func BenchmarkResult_UnwrapOr_Err_Int(b *testing.B) {
+	b.ReportAllocs()
+	for n := 0; n < b.N; n++ {
+		res := shepard.Err[int, string]("error")
+		_ = res.UnwrapOr(42)
+	}
+}
+
+func BenchmarkNative_ErrorFallback_Ok_Int(b *testing.B) {
+	b.ReportAllocs()
+	getValue := func(n int) (int, error) {
+		return n, nil
+	}
+	for n := 0; n < b.N; n++ {
+		val, err := getValue(n)
+		if err != nil {
+			val = 0
+		}
+		_ = val
+	}
+}
+
+func BenchmarkNative_ErrorFallback_Err_Int(b *testing.B) {
+	b.ReportAllocs()
+	getValue := func() (int, error) {
+		return 0, errors.New("error")
+	}
+	for n := 0; n < b.N; n++ {
+		val, err := getValue()
+		if err != nil {
+			val = 42
+		}
+		_ = val
+	}
+}
+
+// --- AndThen vs If Err Chain ---
+
+func BenchmarkResult_AndThen_Int(b *testing.B) {
+	b.ReportAllocs()
+	square := shepard.ResultAndThenFunc[int, string](func(val int) shepard.Result[int, string] {
+		return shepard.Ok[int, string](val * val)
+	})
+	for n := 0; n < b.N; n++ {
+		res := shepard.Ok[int, string](n)
+		_ = res.AndThen(square)
+	}
+}
+
+func BenchmarkNative_IfErrChain_Int(b *testing.B) {
+	b.ReportAllocs()
+	getValue := func(n int) (int, error) {
+		return n, nil
+	}
+	square := func(val int) (int, error) {
+		return val * val, nil
+	}
+	for n := 0; n < b.N; n++ {
+		val, err := getValue(n)
+		if err == nil {
+			val, err = square(val)
+		}
+		_, _ = val, err
+	}
+}
+
+// --- OrElse vs Error Recovery ---
+
+func BenchmarkResult_OrElse_Int(b *testing.B) {
+	b.ReportAllocs()
+	recover := shepard.ResultOrElseFunc[int, string](func(err string) shepard.Result[int, string] {
+		return shepard.Ok[int, string](0)
+	})
+	for n := 0; n < b.N; n++ {
+		res := shepard.Err[int, string]("error")
+		_ = res.OrElse(recover)
+	}
+}
+
+func BenchmarkNative_ErrorRecover_Int(b *testing.B) {
+	b.ReportAllocs()
+	getValue := func() (int, error) {
+		return 0, errors.New("error")
+	}
+	recover := func(err error) (int, error) {
+		return 0, nil
+	}
+	for n := 0; n < b.N; n++ {
+		val, err := getValue()
+		if err != nil {
+			val, err = recover(err)
+		}
+		_, _ = val, err
+	}
+}
+
+// --- Equal vs Direct Comparison ---
+
+func BenchmarkResult_Equal_Int(b *testing.B) {
+	b.ReportAllocs()
+	res1 := shepard.Ok[int, string](42)
+	res2 := shepard.Ok[int, string](42)
+	for n := 0; n < b.N; n++ {
+		_ = res1.Equal(res2)
+	}
+}
+
+func BenchmarkNative_DirectEqual_Result_Int(b *testing.B) {
+	b.ReportAllocs()
+	val1, err1 := 42, error(nil)
+	val2, err2 := 42, error(nil)
+	for n := 0; n < b.N; n++ {
+		var equal bool
+		if err1 == nil && err2 == nil {
+			equal = val1 == val2
+		} else if err1 != nil && err2 != nil {
+			equal = err1.Error() == err2.Error()
+		} else {
+			equal = false
+		}
+		_ = equal
+	}
+}
+
+func BenchmarkResult_Equal_CustomType(b *testing.B) {
+	b.ReportAllocs()
+	res1 := shepard.Ok[testutils.TestType, string](testutils.TestType{Val: "test"})
+	res2 := shepard.Ok[testutils.TestType, string](testutils.TestType{Val: "test"})
+	for n := 0; n < b.N; n++ {
+		_ = res1.Equal(res2)
+	}
+}
+
+func BenchmarkNative_DirectEqual_Result_CustomType(b *testing.B) {
+	b.ReportAllocs()
+	val1, err1 := testutils.TestType{Val: "test"}, error(nil)
+	val2, err2 := testutils.TestType{Val: "test"}, error(nil)
+	for n := 0; n < b.N; n++ {
+		var equal bool
+		if err1 == nil && err2 == nil {
+			equal = val1.Val == val2.Val
+		} else if err1 != nil && err2 != nil {
+			equal = err1.Error() == err2.Error()
+		} else {
+			equal = false
+		}
+		_ = equal
+	}
+}
+
+// --- Chained Error Propagation ---
+
+func BenchmarkResult_ChainedOps_Int(b *testing.B) {
+	b.ReportAllocs()
+	for n := 0; n < b.N; n++ {
+		res := shepard.Ok[int, string](n)
+		res = res.AndThen(func(v int) shepard.Result[int, string] {
+			if v%2 == 0 {
+				return shepard.Ok[int, string](v * 2)
+			}
+			return shepard.Err[int, string]("odd number")
+		})
+		res = res.OrElse(func(err string) shepard.Result[int, string] {
+			return shepard.Ok[int, string](0)
+		})
+		_ = res.UnwrapOr(-1)
+	}
+}
+
+func BenchmarkNative_ChainedErrorOps_Int(b *testing.B) {
+	b.ReportAllocs()
+	for n := 0; n < b.N; n++ {
+		val := n
+		var err error
+		// AndThen: double if even, else error
+		if err == nil {
+			if val%2 == 0 {
+				val = val * 2
+			} else {
+				err = errors.New("odd number")
+			}
+		}
+		// OrElse: recover from error
+		if err != nil {
+			val = 0
+			err = nil
+		}
+		// UnwrapOr
+		if err != nil {
+			val = -1
+		}
+		_ = val
+	}
 }

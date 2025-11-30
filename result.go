@@ -12,7 +12,7 @@ type ResultOrElseFunc[T any, E any] func(val E) Result[T, E]
 // Result is a type that represents either success (Ok) or failure (Err)
 type Result[T any, E any] struct {
 	ok  *T
-	err *Error[E]
+	err *E
 }
 
 // Ok (T, E) contains the success value
@@ -27,7 +27,7 @@ func Ok[T any, E any](val T) Result[T, E] {
 func Err[T any, E any](err E) Result[T, E] {
 	return Result[T, E]{
 		ok:  nil,
-		err: NewError[E](err),
+		err: &err,
 	}
 }
 
@@ -35,10 +35,10 @@ func Err[T any, E any](err E) Result[T, E] {
 //
 // Because this function may panic, its use is generally discouraged. Instead, prefer to use pattern matching and handle the Err case explicitly, or call UnwrapOr, UnwrapOrElse, or UnwrapOrDefault.
 //
-// Panics if the value is an Err, with a panic message provided by the Err’s value.
+// Panics if the value is an Err, with a panic message provided by the Err's value.
 func (r Result[T, E]) Unwrap() T {
 	if r.IsErr() {
-		panic(fmt.Errorf("%v", r.err.Value()))
+		panic(fmt.Errorf("%v", *r.err))
 	}
 	return *r.ok
 }
@@ -56,7 +56,7 @@ func (r Result[T, E]) UnwrapOr(defaultValue T) T {
 // UnwrapOrElse returns the contained Ok value or computes it from a closure.
 func (r Result[T, E]) UnwrapOrElse(elseFunc ResultUnwrapElseFunc[T, E]) T {
 	if r.IsErr() {
-		return elseFunc(r.Err().Unwrap())
+		return elseFunc(*r.err)
 	}
 	return r.Unwrap()
 }
@@ -98,7 +98,7 @@ func (r Result[T, E]) OrElse(op ResultOrElseFunc[T, E]) Result[T, E] {
 	if r.IsOk() {
 		return r
 	}
-	return op(r.Err().Unwrap())
+	return op(*r.err)
 }
 
 // And returns res if the Result is Ok, otherwise returns the Err value of self.
@@ -146,8 +146,7 @@ func (r Result[T, E]) Ok() Option[T] {
 // Converts self into an Option[E], consuming self, and discarding the success value, if any.
 func (r Result[T, E]) Err() Option[E] {
 	if r.IsErr() {
-		err := *r.err
-		return Some[E](err.Value())
+		return Some[E](*r.err)
 	}
 	return None[E]()
 }
@@ -159,7 +158,7 @@ func (r Result[T, E]) Err() Option[E] {
 // Panics if the value is an Err, with a panic message including the passed message, and the content of the Err.
 func (r Result[T, E]) Expect(err E) T {
 	if r.IsErr() {
-		panic(fmt.Errorf("%v: %v", err, r.err.Value()))
+		panic(fmt.Errorf("%v: %v", err, *r.err))
 	}
 	return r.Unwrap()
 }
@@ -171,19 +170,19 @@ func (r Result[T, E]) ExpectErr(err E) E {
 	if r.IsOk() {
 		panic(fmt.Errorf("%v: %v", err, r.Unwrap()))
 	}
-	return r.Err().Unwrap()
+	return *r.err
 }
 
 // UnwrapErr Returns the contained Err value, consuming the self value.
 //
-// Panics if the value is an Ok, with a custom panic message provided by the Ok’s value.
+// Panics if the value is an Ok, with a custom panic message provided by the Ok's value.
 func (r Result[T, E]) UnwrapErr() E {
 	if r.IsOk() {
 		panic(fmt.Errorf("%v", r.Unwrap()))
 	}
-	return r.Err().Unwrap()
+	return *r.err
 }
 
-func (r Result[T, E]) AsMut() (*T, *Error[E]) {
+func (r Result[T, E]) AsMut() (*T, *E) {
 	return r.ok, r.err
 }
