@@ -10,24 +10,26 @@ type ResultAndThenFunc[T any, E any] func(val T) Result[T, E]
 type ResultOrElseFunc[T any, E any] func(val E) Result[T, E]
 
 // Result is a type that represents either success (Ok) or failure (Err)
+// Uses inline storage to avoid heap allocations.
 type Result[T any, E any] struct {
-	ok  *T
-	err *E
+	ok   T
+	err  E
+	isOk bool
 }
 
 // Ok (T, E) contains the success value
 func Ok[T any, E any](val T) Result[T, E] {
 	return Result[T, E]{
-		ok:  &val,
-		err: nil,
+		ok:   val,
+		isOk: true,
 	}
 }
 
 // Err (E) contains the error value
 func Err[T any, E any](err E) Result[T, E] {
 	return Result[T, E]{
-		ok:  nil,
-		err: &err,
+		err:  err,
+		isOk: false,
 	}
 }
 
@@ -38,9 +40,9 @@ func Err[T any, E any](err E) Result[T, E] {
 // Panics if the value is an Err, with a panic message provided by the Err's value.
 func (r Result[T, E]) Unwrap() T {
 	if r.IsErr() {
-		panic(fmt.Errorf("%v", *r.err))
+		panic(fmt.Errorf("%v", r.err))
 	}
-	return *r.ok
+	return r.ok
 }
 
 // UnwrapOr returns the contained Ok value or a provided default.
@@ -56,7 +58,7 @@ func (r Result[T, E]) UnwrapOr(defaultValue T) T {
 // UnwrapOrElse returns the contained Ok value or computes it from a closure.
 func (r Result[T, E]) UnwrapOrElse(elseFunc ResultUnwrapElseFunc[T, E]) T {
 	if r.IsErr() {
-		return elseFunc(*r.err)
+		return elseFunc(r.err)
 	}
 	return r.Unwrap()
 }
@@ -73,12 +75,12 @@ func (r Result[T, E]) UnwrapOrDefault() T {
 
 // IsOk returns true if the Result is Ok
 func (r Result[T, E]) IsOk() bool {
-	return r.err == nil
+	return r.isOk
 }
 
 // IsErr returns true if the Result is Err
 func (r Result[T, E]) IsErr() bool {
-	return r.err != nil
+	return !r.isOk
 }
 
 // Or returns res if the Result is Err, otherwise returns the Ok value of self.
@@ -98,7 +100,7 @@ func (r Result[T, E]) OrElse(op ResultOrElseFunc[T, E]) Result[T, E] {
 	if r.IsOk() {
 		return r
 	}
-	return op(*r.err)
+	return op(r.err)
 }
 
 // And returns res if the Result is Ok, otherwise returns the Err value of self.
@@ -117,7 +119,7 @@ func (r Result[T, E]) And(res Result[T, E]) Result[T, E] {
 // This function can be used for control flow based on Result values.
 func (r Result[T, E]) AndThen(op ResultAndThenFunc[T, E]) Result[T, E] {
 	if r.IsOk() {
-		return op(*r.ok)
+		return op(r.ok)
 	}
 	return r
 }
@@ -125,10 +127,10 @@ func (r Result[T, E]) AndThen(op ResultAndThenFunc[T, E]) Result[T, E] {
 // Equal checks if two Result`s contain the same Result value
 func (r Result[T, E]) Equal(res Result[T, E]) bool {
 	if r.IsOk() && res.IsOk() {
-		return reflect.DeepEqual(r.Unwrap(), res.Unwrap())
+		return reflect.DeepEqual(r.ok, res.ok)
 	}
 	if r.IsErr() && res.IsErr() {
-		return reflect.DeepEqual(r.Err(), res.Err())
+		return reflect.DeepEqual(r.err, res.err)
 	}
 	return false
 }
@@ -139,14 +141,14 @@ func (r Result[T, E]) Ok() Option[T] {
 	if r.IsErr() {
 		return None[T]()
 	}
-	return Some[T](r.Unwrap())
+	return Some[T](r.ok)
 }
 
 // Err converts from Result[T, E] to Option[E].
 // Converts self into an Option[E], consuming self, and discarding the success value, if any.
 func (r Result[T, E]) Err() Option[E] {
 	if r.IsErr() {
-		return Some[E](*r.err)
+		return Some[E](r.err)
 	}
 	return None[E]()
 }
@@ -158,9 +160,9 @@ func (r Result[T, E]) Err() Option[E] {
 // Panics if the value is an Err, with a panic message including the passed message, and the content of the Err.
 func (r Result[T, E]) Expect(err E) T {
 	if r.IsErr() {
-		panic(fmt.Errorf("%v: %v", err, *r.err))
+		panic(fmt.Errorf("%v: %v", err, r.err))
 	}
-	return r.Unwrap()
+	return r.ok
 }
 
 // ExpectErr returns the contained Err value, consuming the self value.
@@ -168,9 +170,9 @@ func (r Result[T, E]) Expect(err E) T {
 // Panics if the value is an Ok, with a panic message including the passed message, and the content of the Ok.
 func (r Result[T, E]) ExpectErr(err E) E {
 	if r.IsOk() {
-		panic(fmt.Errorf("%v: %v", err, r.Unwrap()))
+		panic(fmt.Errorf("%v: %v", err, r.ok))
 	}
-	return *r.err
+	return r.err
 }
 
 // UnwrapErr Returns the contained Err value, consuming the self value.
@@ -178,11 +180,38 @@ func (r Result[T, E]) ExpectErr(err E) E {
 // Panics if the value is an Ok, with a custom panic message provided by the Ok's value.
 func (r Result[T, E]) UnwrapErr() E {
 	if r.IsOk() {
-		panic(fmt.Errorf("%v", r.Unwrap()))
+		panic(fmt.Errorf("%v", r.ok))
 	}
-	return *r.err
+	return r.err
 }
 
-func (r Result[T, E]) AsMut() (*T, *E) {
-	return r.ok, r.err
+// AsMut returns mutable references to the contained Ok or Err value.
+// Returns (okPtr, errPtr) where one is valid based on IsOk()/IsErr().
+// This provides the functionality of Rust's as_mut() in a Go-idiomatic way.
+func (r *Result[T, E]) AsMut() (*T, *E) {
+	if r.isOk {
+		return &r.ok, nil
+	}
+	return nil, &r.err
+}
+
+// AsRef returns references to the contained Ok or Err value.
+// Returns (okPtr, errPtr) where one is valid based on IsOk()/IsErr().
+func (r *Result[T, E]) AsRef() (*T, *E) {
+	if r.isOk {
+		return &r.ok, nil
+	}
+	return nil, &r.err
+}
+
+// EqualWith checks if two Results contain equal values using custom comparators.
+// This avoids the overhead of reflect.DeepEqual for performance-critical code.
+func (r Result[T, E]) EqualWith(other Result[T, E], eqOk func(a, b T) bool, eqErr func(a, b E) bool) bool {
+	if r.isOk != other.isOk {
+		return false
+	}
+	if r.isOk {
+		return eqOk(r.ok, other.ok)
+	}
+	return eqErr(r.err, other.err)
 }

@@ -244,3 +244,22 @@ func (o Option[T]) Expect(err any) T {
 	}
 	return o.Unwrap()
 }
+
+// Get returns the contained value and a boolean indicating whether it's Some.
+// This is a fast-path accessor that avoids constructing Option objects in hot paths.
+// Equivalent to Rust's into_inner pattern.
+func (o Option[T]) Get() (T, bool) {
+	return o.v, o.some
+}
+
+// EqualWith checks if two Options contain equal values using a custom comparator.
+// This avoids the overhead of reflect.DeepEqual for performance-critical code.
+func (o Option[T]) EqualWith(other Option[T], eq func(a, b T) bool) bool {
+	if o.some != other.some {
+		return false
+	}
+	if !o.some {
+		return true // Both are None
+	}
+	return eq(o.v, other.v)
+}
