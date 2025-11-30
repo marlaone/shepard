@@ -131,3 +131,31 @@ func TestSlice_Iter(t *testing.T) {
 	assert.True(t, iter.Next().Equal(shepard.Some(4)))
 	assert.True(t, iter.Next().Equal(shepard.None[int]()))
 }
+
+func TestSlice_Copy(t *testing.T) {
+	// Test copy to slice with sufficient capacity
+	src := slice.Init(1, 2, 3, 4, 5)
+	dest := slice.WithCapacity[int](5)
+	for i := 0; i < 5; i++ {
+		dest.Push(0)
+	}
+	n := src.Copy(&dest)
+	assert.Equal(t, 5, n)
+	assert.Equal(t, slice.Init(1, 2, 3, 4, 5), dest)
+
+	// Test copy to slice with insufficient capacity (partial copy)
+	src2 := slice.Init(10, 20, 30, 40, 50)
+	dest2 := slice.WithCapacity[int](3)
+	for i := 0; i < 3; i++ {
+		dest2.Push(0)
+	}
+	n2 := src2.Copy(&dest2)
+	assert.Equal(t, 3, n2)
+	assert.Equal(t, slice.Init(10, 20, 30), dest2)
+
+	// Test copy from empty slice
+	src3 := slice.New[int]()
+	dest3 := slice.Init(1, 2, 3)
+	n3 := src3.Copy(&dest3)
+	assert.Equal(t, 0, n3)
+}

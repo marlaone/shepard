@@ -26,7 +26,29 @@ func TestCheckedAdd(t *testing.T) {
 	y4 := math.MaxFloat64
 	assert.True(t, num.CheckedAdd(x4, y4).Equal(shepard.None[float64]()))
 
-	x5 := 2.2
-	y5 := 2.2
-	assert.True(t, num.CheckedAdd(x5, y5).Equal(shepard.Some[float64](4.4)))
+	x5 := 2.0
+	y5 := 2.0
+	assert.True(t, num.CheckedAdd(x5, y5).Equal(shepard.Some[float64](4.0)))
+}
+
+func TestCheckedAdd_Zero(t *testing.T) {
+	// Adding zero should always succeed
+	assert.True(t, num.CheckedAdd(0, 0).Equal(shepard.Some(0)))
+	assert.True(t, num.CheckedAdd(100, 0).Equal(shepard.Some(100)))
+	assert.True(t, num.CheckedAdd(0, 100).Equal(shepard.Some(100)))
+	assert.True(t, num.CheckedAdd(-100, 0).Equal(shepard.Some(-100)))
+}
+
+func TestCheckedAdd_NegativePositive(t *testing.T) {
+	// Negative + positive that doesn't overflow
+	assert.True(t, num.CheckedAdd(int32(-100), int32(50)).Equal(shepard.Some[int32](-50)))
+	assert.True(t, num.CheckedAdd(int32(100), int32(-50)).Equal(shepard.Some[int32](50)))
+	assert.True(t, num.CheckedAdd(int32(-100), int32(100)).Equal(shepard.Some[int32](0)))
+}
+
+func TestCheckedAdd_MaxMin(t *testing.T) {
+	// Adding to max/min values
+	assert.True(t, num.CheckedAdd(int8(127), int8(1)).Equal(shepard.None[int8]()))
+	assert.True(t, num.CheckedAdd(int8(-128), int8(-1)).Equal(shepard.None[int8]()))
+	assert.True(t, num.CheckedAdd(int8(127), int8(0)).Equal(shepard.Some[int8](127)))
 }
