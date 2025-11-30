@@ -34,25 +34,28 @@ func (b *ReaderWriterCloserBuffer) Read(p *slice.Slice[byte]) shepard.Result[int
 }
 
 func (b *ReaderWriterCloserBuffer) Write(p slice.Slice[byte]) shepard.Result[int, error] {
+	guard := b.buf.Lock()
+	defer b.buf.Unlock()
 
 	if b.closed {
 		return shepard.Err[int, error](errors.New("can't write to closed buffer"))
 	}
 
-	guard := b.buf.Lock()
-	defer b.buf.Unlock()
 	buf := guard.Unwrap()
-
 	buf.Append(&p)
 
 	return shepard.Ok[int, error](buf.Len())
 }
 
 func (b *ReaderWriterCloserBuffer) Close() shepard.Result[shepard.Nil, error] {
+	b.buf.Lock()
+	defer b.buf.Unlock()
 	b.closed = true
 	return shepard.Ok[shepard.Nil, error](shepard.Nil{})
 }
 
 func (b *ReaderWriterCloserBuffer) Closed() bool {
+	b.buf.RLock()
+	defer b.buf.RUnlock()
 	return b.closed
 }

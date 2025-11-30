@@ -18,16 +18,14 @@ type Guard[T any] struct {
 }
 
 type Mutex[T any] struct {
-	mutex *sync.Mutex
+	mutex sync.Mutex
 	t     T
 }
 
 func New[T any](t T) Mutex[T] {
-	m := Mutex[T]{
-		mutex: &sync.Mutex{},
-		t:     t,
+	return Mutex[T]{
+		t: t,
 	}
-	return m
 }
 
 func (m *Mutex[T]) Lock() *LockResult[T] {
