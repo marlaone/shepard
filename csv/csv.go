@@ -2,12 +2,13 @@ package csv
 
 import (
 	"encoding/csv"
-	"errors"
 	"fmt"
-	"github.com/marlaone/shepard"
 	"io"
 	"reflect"
 	"strconv"
+	"strings"
+
+	"github.com/marlaone/shepard"
 )
 
 type Reader[T any] struct {
@@ -47,22 +48,43 @@ func (r *Reader[T]) parseRecord(records []string) shepard.Result[T, error] {
 		r.recordDescriber[field.Name] = field.Type
 	}
 
-	for n, t := range r.recordDescriber {
-		value := records[r.header[n]]
-		fmt.Println(n, value)
-		switch t.Kind() {
+	for fieldName, fieldType := range r.recordDescriber {
+		// Look up header using lowercase field name to match CSV headers
+		headerKey := strings.ToLower(fieldName)
+		colIndex, ok := r.header[headerKey]
+		if !ok {
+			return shepard.Err[T, error](fmt.Errorf("column %q not found in CSV header", headerKey))
+		}
+		if colIndex >= len(records) {
+			return shepard.Err[T, error](fmt.Errorf("column index %d out of range", colIndex))
+		}
+
+		value := strings.TrimSpace(records[colIndex])
+		switch fieldType.Kind() {
 		case reflect.String:
-			recordValue.FieldByName(n).SetString(value)
+			recordValue.FieldByName(fieldName).SetString(value)
 		case reflect.Bool:
 			v, err := strconv.ParseBool(value)
 			if err != nil {
 				return shepard.Err[T, error](err)
 			}
-			recordValue.FieldByName(n).SetBool(v)
+			recordValue.FieldByName(fieldName).SetBool(v)
+		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+			v, err := strconv.ParseInt(value, 10, 64)
+			if err != nil {
+				return shepard.Err[T, error](err)
+			}
+			recordValue.FieldByName(fieldName).SetInt(v)
+		case reflect.Float32, reflect.Float64:
+			v, err := strconv.ParseFloat(value, 64)
+			if err != nil {
+				return shepard.Err[T, error](err)
+			}
+			recordValue.FieldByName(fieldName).SetFloat(v)
 		}
 	}
 
-	return shepard.Err[T, error](errors.New("unimplemented"))
+	return shepard.Ok[T, error](record)
 }
 
 func (r *Reader[T]) Deserialize() shepard.Result[T, error] {
