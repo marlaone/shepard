@@ -14,10 +14,8 @@ type Slice[T any] struct {
 }
 
 func Init[T any](values ...T) Slice[T] {
-	s := WithCapacity[T](len(values))
-	for _, v := range values {
-		s.Push(v)
-	}
+	s := Slice[T]{values: make([]T, len(values))}
+	copy(s.values, values)
 	return s
 }
 
@@ -41,6 +39,7 @@ func (s Slice[T]) Capacity() int {
 // Reserve reserves capacity for at least additional more elements to be inserted in the given Slice[T].
 func (s *Slice[T]) Reserve(capacity int) {
 	newSlice := make([]T, len(s.values), cap(s.values)+capacity)
+	copy(newSlice, s.values)
 	s.values = newSlice
 }
 
@@ -88,7 +87,17 @@ func (s *Slice[T]) Remove(index int) T {
 // This method operates in place, visiting each element exactly once in the original order,
 // and preserves the order of the retained elements.
 func (s *Slice[T]) Retain(f RetainFunc[T]) {
-	*s = Collect[T](s.Iter().Filter(iter.FilterFunc[T](f)))
+	// Two-pointer in-place algorithm: O(n) time, O(1) space
+	writeIdx := 0
+	for readIdx := range s.values {
+		if f(&s.values[readIdx]) {
+			if writeIdx != readIdx {
+				s.values[writeIdx] = s.values[readIdx]
+			}
+			writeIdx++
+		}
+	}
+	s.values = s.values[:writeIdx]
 }
 
 // Push appends an element to the back of a collection.
