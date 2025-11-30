@@ -2,29 +2,83 @@ package num
 
 import (
 	"fmt"
-	"github.com/marlaone/shepard"
-	"reflect"
 	"strconv"
+
+	"github.com/marlaone/shepard"
 )
 
 func ParseString[T Number](n string) shepard.Result[T, error] {
 	var target T
-	numType := reflect.TypeOf(target)
-	switch numType.Kind() {
-	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		v, err := strconv.ParseInt(n, 10, numType.Bits())
+	// Use type switch instead of reflection for better performance
+	switch any(target).(type) {
+	case int:
+		v, err := strconv.ParseInt(n, 10, 0)
 		if err != nil {
 			return shepard.Err[T, error](err)
 		}
 		return shepard.Ok[T, error](T(v))
-	case reflect.Float32, reflect.Float64:
-		v, err := strconv.ParseFloat(n, numType.Bits())
+	case int8:
+		v, err := strconv.ParseInt(n, 10, 8)
 		if err != nil {
 			return shepard.Err[T, error](err)
 		}
 		return shepard.Ok[T, error](T(v))
-	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-		v, err := strconv.ParseUint(n, 10, numType.Bits())
+	case int16:
+		v, err := strconv.ParseInt(n, 10, 16)
+		if err != nil {
+			return shepard.Err[T, error](err)
+		}
+		return shepard.Ok[T, error](T(v))
+	case int32:
+		v, err := strconv.ParseInt(n, 10, 32)
+		if err != nil {
+			return shepard.Err[T, error](err)
+		}
+		return shepard.Ok[T, error](T(v))
+	case int64:
+		v, err := strconv.ParseInt(n, 10, 64)
+		if err != nil {
+			return shepard.Err[T, error](err)
+		}
+		return shepard.Ok[T, error](T(v))
+	case uint:
+		v, err := strconv.ParseUint(n, 10, 0)
+		if err != nil {
+			return shepard.Err[T, error](err)
+		}
+		return shepard.Ok[T, error](T(v))
+	case uint8:
+		v, err := strconv.ParseUint(n, 10, 8)
+		if err != nil {
+			return shepard.Err[T, error](err)
+		}
+		return shepard.Ok[T, error](T(v))
+	case uint16:
+		v, err := strconv.ParseUint(n, 10, 16)
+		if err != nil {
+			return shepard.Err[T, error](err)
+		}
+		return shepard.Ok[T, error](T(v))
+	case uint32:
+		v, err := strconv.ParseUint(n, 10, 32)
+		if err != nil {
+			return shepard.Err[T, error](err)
+		}
+		return shepard.Ok[T, error](T(v))
+	case uint64:
+		v, err := strconv.ParseUint(n, 10, 64)
+		if err != nil {
+			return shepard.Err[T, error](err)
+		}
+		return shepard.Ok[T, error](T(v))
+	case float32:
+		v, err := strconv.ParseFloat(n, 32)
+		if err != nil {
+			return shepard.Err[T, error](err)
+		}
+		return shepard.Ok[T, error](T(v))
+	case float64:
+		v, err := strconv.ParseFloat(n, 64)
 		if err != nil {
 			return shepard.Err[T, error](err)
 		}
