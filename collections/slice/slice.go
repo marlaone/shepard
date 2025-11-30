@@ -1,7 +1,9 @@
 package slice
 
 import (
+	"cmp"
 	"fmt"
+	"slices"
 
 	"github.com/marlaone/shepard"
 	"github.com/marlaone/shepard/iter"
@@ -100,6 +102,13 @@ func (s *Slice[T]) Retain(f RetainFunc[T]) {
 	s.values = s.values[:writeIdx]
 }
 
+// FilterInPlace is an alias for Retain that matches iterator naming conventions.
+// It filters the slice in place, keeping only elements where predicate returns true.
+// Zero allocations - O(n) time, O(1) space.
+func (s *Slice[T]) FilterInPlace(predicate RetainFunc[T]) {
+	s.Retain(predicate)
+}
+
 // Push appends an element to the back of a collection.
 func (s *Slice[T]) Push(value T) {
 	s.values = append(s.values, value)
@@ -195,4 +204,32 @@ func (s Slice[T]) Iter() iter.Iter[T] {
 
 func (s *Slice[T]) Copy(dest *Slice[T]) int {
 	return copy(dest.values, s.values)
+}
+
+// SortFunc sorts the slice in-place using a comparison function.
+// The comparison function should return a negative number when a < b,
+// zero when a == b, and a positive number when a > b.
+// This is the equivalent of Rust's sort_by().
+func (s *Slice[T]) SortFunc(compare func(a, b T) int) {
+	slices.SortFunc(s.values, compare)
+}
+
+// SortFuncStable sorts the slice in-place using a stable sort.
+// Equal elements maintain their original order.
+// This is the equivalent of Rust's sort_by() with stability guarantees.
+func (s *Slice[T]) SortFuncStable(compare func(a, b T) int) {
+	slices.SortStableFunc(s.values, compare)
+}
+
+// Sort sorts a slice of ordered types in ascending order.
+// This is the equivalent of Rust's sort() for Ord types.
+func Sort[T cmp.Ordered](s *Slice[T]) {
+	slices.Sort(s.values)
+}
+
+// SortDesc sorts a slice of ordered types in descending order.
+func SortDesc[T cmp.Ordered](s *Slice[T]) {
+	slices.SortFunc(s.values, func(a, b T) int {
+		return cmp.Compare(b, a)
+	})
 }
