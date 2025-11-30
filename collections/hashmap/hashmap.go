@@ -52,6 +52,16 @@ func (m HashMap[K, V]) Keys() iter.Iter[K] {
 	return iter.New(keys)
 }
 
+// KeysUnordered returns an iter.Iter[K] visiting all keys in arbitrary order.
+// This is faster than Keys() as it skips sorting.
+func (m HashMap[K, V]) KeysUnordered() iter.Iter[K] {
+	keys := make([]K, 0, len(m.data))
+	for k := range m.data {
+		keys = append(keys, k)
+	}
+	return iter.New(keys)
+}
+
 // Values returns an iter.Iter[V] visiting all values in key-sorted order.
 func (m HashMap[K, V]) Values() iter.Iter[V] {
 	keys := make([]K, 0, len(m.data))
@@ -63,6 +73,16 @@ func (m HashMap[K, V]) Values() iter.Iter[V] {
 	values := make([]V, 0, len(m.data))
 	for _, k := range keys {
 		e := m.data[k]
+		values = append(values, *e.OrDefault())
+	}
+	return iter.New(values)
+}
+
+// ValuesUnordered returns an iter.Iter[V] visiting all values in arbitrary order.
+// This is faster than Values() as it skips sorting.
+func (m HashMap[K, V]) ValuesUnordered() iter.Iter[V] {
+	values := make([]V, 0, len(m.data))
+	for _, e := range m.data {
 		values = append(values, *e.OrDefault())
 	}
 	return iter.New(values)
@@ -100,6 +120,17 @@ func (m HashMap[K, V]) Iter() iter.Iter[Pair[*K, *V]] {
 	return iter.New(pairs)
 }
 
+// IterUnordered returns an iter.Iter[Pair[K, V]] visiting all key-value pairs in arbitrary order.
+// This is faster than Iter() as it skips sorting.
+// Note: Returns value copies instead of pointers for safety with unordered iteration.
+func (m HashMap[K, V]) IterUnordered() iter.Iter[Pair[K, V]] {
+	pairs := make([]Pair[K, V], 0, len(m.data))
+	for k, e := range m.data {
+		pairs = append(pairs, Pair[K, V]{Key: k, Value: *e.OrDefault()})
+	}
+	return iter.New(pairs)
+}
+
 // Len returns the number of elements in the map.
 func (m HashMap[K, V]) Len() int {
 	return len(m.data)
@@ -116,13 +147,17 @@ func (m *HashMap[K, V]) Clear() {
 }
 
 // Entry gets the given key's corresponding Entry[K, V] in the map for in-place manipulation.
-func (m *HashMap[K, V]) Entry(key K) *Entry[K, V] {
+// Returns Entry by value (Rust-aligned: avoids heap allocation for the Entry struct itself).
+// For vacant entries, insertion into the map is deferred until OrInsert/OrInsertWith is called.
+// Key is stored by value in Entry to prevent heap escape.
+func (m *HashMap[K, V]) Entry(key K) Entry[K, V] {
 	if e, ok := m.data[key]; ok {
-		return e
+		// Return existing entry (occupied) - key stored by value, no heap escape
+		return Entry[K, V]{key: key, value: e.value, hashmap: m, isVacant: false}
 	}
-	e := Vacant[K, V](&key)
-	m.data[key] = &e
-	return &e
+	// Create vacant entry with back-reference for lazy insertion
+	// Key stored by value - no heap escape!
+	return Vacant[K, V](key, m)
 }
 
 // Get returns the value corresponding to the key, without modifying the map.
@@ -133,12 +168,13 @@ func (m HashMap[K, V]) Get(k K) shepard.Option[*V] {
 	return shepard.None[*V]()
 }
 
-// GetKeyValue returns the key-value Pair[*K, *V] corresponding to the supplied key.
-func (m HashMap[K, V]) GetKeyValue(k K) shepard.Option[Pair[*K, *V]] {
+// GetKeyValue returns the key-value Pair[K, *V] corresponding to the supplied key.
+// Note: Key is returned by value (not pointer) for consistency with Entry.Key().
+func (m HashMap[K, V]) GetKeyValue(k K) shepard.Option[Pair[K, *V]] {
 	if e, ok := m.data[k]; ok && e.IsOccupied() {
-		return shepard.Some(Pair[*K, *V]{Key: e.Key(), Value: e.Value()})
+		return shepard.Some(Pair[K, *V]{Key: e.Key(), Value: e.Value()})
 	}
-	return shepard.None[Pair[*K, *V]]()
+	return shepard.None[Pair[K, *V]]()
 }
 
 // ContainsKey returns true if the map contains a value for the specified key.
@@ -156,11 +192,11 @@ func (m HashMap[K, V]) ContainsKey(k K) bool {
 func (m *HashMap[K, V]) Insert(k K, v V) shepard.Option[V] {
 	if existingEntry, ok := m.data[k]; ok && existingEntry.IsOccupied() {
 		oldValue := *existingEntry.Value()
-		e := Occupied[K, V](&k, &v)
+		e := Occupied[K, V](k, &v)
 		m.data[k] = &e
 		return shepard.Some(oldValue)
 	}
-	e := Occupied[K, V](&k, &v)
+	e := Occupied[K, V](k, &v)
 	m.data[k] = &e
 	return shepard.None[V]()
 }

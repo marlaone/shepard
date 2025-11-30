@@ -13,12 +13,12 @@ func (m *HashMap[K, V]) Clone() HashMap[K, V] {
 	for k, e := range m.data {
 		if e.IsOccupied() {
 			v := *e.Value()
-			newEntry := Occupied[K, V](&k, &v)
-			clone.data[k] = &newEntry
-		} else {
-			newEntry := Vacant[K, V](&k)
+			newEntry := Occupied[K, V](k, &v)
 			clone.data[k] = &newEntry
 		}
+		// Note: We don't clone vacant entries - they shouldn't exist in the map
+		// after the lazy insertion optimization. If somehow there's a vacant entry,
+		// we skip it since it represents "no value" anyway.
 	}
 	return clone
 }

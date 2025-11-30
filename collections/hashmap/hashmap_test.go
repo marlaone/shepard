@@ -86,7 +86,8 @@ func TestHashMap_Entry(t *testing.T) {
 	letters := hashmap.New[rune, int]()
 
 	for _, ch := range []rune("a short treatise on fungi") {
-		letters.Entry(ch).AndModify(func(counter *int) {
+		entry := letters.Entry(ch)
+		entry.AndModify(func(counter *int) {
 			*counter += 1
 		}).OrInsert(1)
 	}
@@ -108,10 +109,10 @@ func TestHashMap_GetKeyValue(t *testing.T) {
 	m := hashmap.New[int, string]()
 	m.Insert(1, "a")
 
-	expectedKey := 1
 	expectedValue := "a"
-	assert.True(t, m.GetKeyValue(1).Equal(shepard.Some[hashmap.Pair[*int, *string]](hashmap.Pair[*int, *string]{&expectedKey, &expectedValue})))
-	assert.True(t, m.GetKeyValue(2).Equal(shepard.None[hashmap.Pair[*int, *string]]()))
+	// Key is now returned by value, not pointer
+	assert.True(t, m.GetKeyValue(1).Equal(shepard.Some[hashmap.Pair[int, *string]](hashmap.Pair[int, *string]{1, &expectedValue})))
+	assert.True(t, m.GetKeyValue(2).Equal(shepard.None[hashmap.Pair[int, *string]]()))
 }
 
 func TestHashMap_Insert(t *testing.T) {
