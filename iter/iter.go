@@ -33,12 +33,8 @@ func (i *Iter[T]) Next() shepard.Option[T] {
 }
 
 func (i Iter[T]) Foreach(op ForeachFunc[T]) {
-	for {
-		next := i.Next()
-		if next.IsNone() {
-			break
-		}
-		op(i.index, next.Unwrap())
+	for idx := i.index + 1; idx < len(i.values); idx++ {
+		op(idx, i.values[idx])
 	}
 }
 
@@ -63,15 +59,10 @@ func (i Iter[T]) Take(n int) Iter[T] {
 // Given an element the closure must return true or false.
 // The returned iterator will yield only the elements for which the closure returns true.
 func (i Iter[T]) Filter(predicate FilterFunc[T]) Iter[T] {
-	newValues := make([]T, 0, cap(i.values))
-	for {
-		next := i.Next()
-		if next.IsNone() {
-			break
-		}
-		v := next.Unwrap()
-		if predicate(&v) {
-			newValues = append(newValues, next.Unwrap())
+	var newValues []T
+	for idx := i.index + 1; idx < len(i.values); idx++ {
+		if predicate(&i.values[idx]) {
+			newValues = append(newValues, i.values[idx])
 		}
 	}
 	return New(newValues)
@@ -85,16 +76,12 @@ func (i Iter[T]) Filter(predicate FilterFunc[T]) Iter[T] {
 //
 // find() is short-circuiting; in other words, it will stop processing as soon as the closure returns true.
 func (i Iter[T]) Find(predicate FindFunc[T]) shepard.Option[T] {
-	for {
-		next := i.Next()
-		if next.IsNone() {
-			return next
-		}
-		v := next.Unwrap()
-		if predicate(&v) {
-			return next
+	for idx := i.index + 1; idx < len(i.values); idx++ {
+		if predicate(&i.values[idx]) {
+			return shepard.Some(i.values[idx])
 		}
 	}
+	return shepard.None[T]()
 }
 
 func (i Iter[T]) Count() int {
