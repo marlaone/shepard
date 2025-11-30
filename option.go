@@ -14,7 +14,8 @@ type OptionOrElseFunc[T any] func() Option[T]
 type OptionGetOrInsertWithFunc[T any] func() T
 
 type Option[T any] struct {
-	v *T
+	v    T
+	some bool
 }
 
 func (o Option[T]) Default() Option[T] {
@@ -23,13 +24,14 @@ func (o Option[T]) Default() Option[T] {
 
 func Some[T any](val T) Option[T] {
 	return Option[T]{
-		v: &val,
+		v:    val,
+		some: true,
 	}
 }
 
 func None[T any]() Option[T] {
 	return Option[T]{
-		v: nil,
+		some: false,
 	}
 }
 
@@ -42,17 +44,17 @@ func (o Option[T]) Unwrap() T {
 	if o.IsNone() {
 		panic(errors.New("unwrap on None Option"))
 	}
-	return *o.v
+	return o.v
 }
 
 // IsSome returns true if the Option is a Some value.
 func (o Option[T]) IsSome() bool {
-	return o.v != nil
+	return o.some
 }
 
 // IsNone returns true if the Option is a None value.
 func (o Option[T]) IsNone() bool {
-	return o.v == nil
+	return !o.some
 }
 
 // UnwrapOr returns the contained Some value or a provided default.
@@ -114,7 +116,7 @@ func (o Option[T]) And(opt Option[T]) Option[T] {
 // Some languages call this operation flatmap.
 func (o Option[T]) AndThen(op OptionAndThenFunc[T]) Option[T] {
 	if o.IsSome() {
-		return op(*o.v)
+		return op(o.v)
 	}
 	return o
 }
@@ -124,7 +126,7 @@ func (o Option[T]) AndThen(op OptionAndThenFunc[T]) Option[T] {
 // Some(t) if predicate returns true (where t is the wrapped value), and
 // None if predicate returns false.
 func (o Option[T]) Filter(predicate OptionFilterFunc[T]) Option[T] {
-	if o.IsSome() && predicate(o.v) {
+	if o.IsSome() && predicate(&o.v) {
 		return o
 	}
 	return None[T]()
@@ -171,8 +173,9 @@ func (o Option[T]) Xor(opt Option[T]) Option[T] {
 //
 // See also GetOrInsert, which doesn't update the value if the option already contains Some.
 func (o *Option[T]) Insert(val T) *T {
-	o.v = &val
-	return o.v
+	o.v = val
+	o.some = true
+	return &o.v
 }
 
 // GetOrInsert inserts value into the option if it is None, then returns a mutable reference to the contained value.
@@ -180,52 +183,54 @@ func (o *Option[T]) Insert(val T) *T {
 // See also Insert, which updates the value even if the option already contains Some.
 func (o *Option[T]) GetOrInsert(val T) *T {
 	if o.IsSome() {
-		return o.v
+		return &o.v
 	}
-	o.v = &val
-	return o.v
+	o.v = val
+	o.some = true
+	return &o.v
 }
 
 // GetOrInsertDefault inserts the Default value into the option if it is None, then returns a mutable reference to the contained value.
 func (o *Option[T]) GetOrInsertDefault() *T {
 	if o.IsSome() {
-		return o.v
+		return &o.v
 	}
 
-	defaultValue := GetDefault[T]()
-	o.v = &defaultValue
+	o.v = GetDefault[T]()
+	o.some = true
 
-	return o.v
+	return &o.v
 }
 
 // GetOrInsertWith inserts a value computed from f into the Option if it is None, then returns a mutable reference to the contained value.
 func (o *Option[T]) GetOrInsertWith(f OptionGetOrInsertWithFunc[T]) *T {
 	if o.IsSome() {
-		return o.v
+		return &o.v
 	}
-	val := f()
-	o.v = &val
-	return o.v
+	o.v = f()
+	o.some = true
+	return &o.v
 }
 
 // Take takes the value out of the Option, leaving a None in its place.
 func (o *Option[T]) Take() Option[T] {
 	old := *o
-	o.v = nil
+	o.some = false
 	return old
 }
 
 // Replace replaces the actual value in the Option by the value given in parameter, returning the old value if present, leaving a Some in its place without deinitializing either one.
 func (o *Option[T]) Replace(value T) Option[T] {
 	old := *o
-	o.v = &value
+	o.v = value
+	o.some = true
 	return old
 }
 
 // Equal checks if two Option`s values are equal
 func (o Option[T]) Equal(opt Option[T]) bool {
 	if o.IsSome() && opt.IsSome() {
-		return reflect.DeepEqual(o.Unwrap(), o.Unwrap())
+		return reflect.DeepEqual(o.Unwrap(), opt.Unwrap())
 	}
 	return o.IsNone() == opt.IsNone()
 }

@@ -299,3 +299,240 @@ func BenchmarkOption_Complex(b *testing.B) {
 		opt.Unwrap()
 	}
 }
+
+// ============================================================================
+// Comparison Benchmarks: Option[T] vs Native Go Patterns
+// ============================================================================
+
+// --- Some/Unwrap vs Pointer Dereference ---
+
+func BenchmarkOption_SomeUnwrap_Int(b *testing.B) {
+	b.ReportAllocs()
+	for n := 0; n < b.N; n++ {
+		opt := shepard.Some[int](n)
+		_ = opt.Unwrap()
+	}
+}
+
+func BenchmarkNative_PointerDeref_Int(b *testing.B) {
+	b.ReportAllocs()
+	for n := 0; n < b.N; n++ {
+		val := n
+		ptr := &val
+		_ = *ptr
+	}
+}
+
+func BenchmarkOption_SomeUnwrap_CustomType(b *testing.B) {
+	b.ReportAllocs()
+	for n := 0; n < b.N; n++ {
+		opt := shepard.Some[testutils.TestType](testutils.TestType{Val: "test"})
+		_ = opt.Unwrap()
+	}
+}
+
+func BenchmarkNative_PointerDeref_CustomType(b *testing.B) {
+	b.ReportAllocs()
+	for n := 0; n < b.N; n++ {
+		val := testutils.TestType{Val: "test"}
+		ptr := &val
+		_ = *ptr
+	}
+}
+
+// --- UnwrapOr vs Nil Coalescing ---
+
+func BenchmarkOption_UnwrapOr_Some_Int(b *testing.B) {
+	b.ReportAllocs()
+	for n := 0; n < b.N; n++ {
+		opt := shepard.Some[int](n)
+		_ = opt.UnwrapOr(0)
+	}
+}
+
+func BenchmarkOption_UnwrapOr_None_Int(b *testing.B) {
+	b.ReportAllocs()
+	for n := 0; n < b.N; n++ {
+		opt := shepard.None[int]()
+		_ = opt.UnwrapOr(42)
+	}
+}
+
+func BenchmarkNative_NilCoalesce_Some_Int(b *testing.B) {
+	b.ReportAllocs()
+	for n := 0; n < b.N; n++ {
+		val := n
+		ptr := &val
+		var result int
+		if ptr != nil {
+			result = *ptr
+		} else {
+			result = 0
+		}
+		_ = result
+	}
+}
+
+func BenchmarkNative_NilCoalesce_None_Int(b *testing.B) {
+	b.ReportAllocs()
+	for n := 0; n < b.N; n++ {
+		var ptr *int
+		var result int
+		if ptr != nil {
+			result = *ptr
+		} else {
+			result = 42
+		}
+		_ = result
+	}
+}
+
+// --- AndThen vs If Chain ---
+
+func BenchmarkOption_AndThen_Int(b *testing.B) {
+	b.ReportAllocs()
+	square := shepard.OptionAndThenFunc[int](func(val int) shepard.Option[int] {
+		return shepard.Some[int](val * val)
+	})
+	for n := 0; n < b.N; n++ {
+		opt := shepard.Some[int](n)
+		_ = opt.AndThen(square)
+	}
+}
+
+func BenchmarkNative_IfChain_Int(b *testing.B) {
+	b.ReportAllocs()
+	square := func(val int) *int {
+		result := val * val
+		return &result
+	}
+	for n := 0; n < b.N; n++ {
+		val := n
+		ptr := &val
+		var result *int
+		if ptr != nil {
+			result = square(*ptr)
+		}
+		_ = result
+	}
+}
+
+// --- Filter vs If Check ---
+
+func BenchmarkOption_Filter_Int(b *testing.B) {
+	b.ReportAllocs()
+	isEven := shepard.OptionFilterFunc[int](func(v *int) bool {
+		return *v%2 == 0
+	})
+	for n := 0; n < b.N; n++ {
+		opt := shepard.Some[int](n)
+		_ = opt.Filter(isEven)
+	}
+}
+
+func BenchmarkNative_IfFilter_Int(b *testing.B) {
+	b.ReportAllocs()
+	isEven := func(v int) bool {
+		return v%2 == 0
+	}
+	for n := 0; n < b.N; n++ {
+		val := n
+		ptr := &val
+		var result *int
+		if ptr != nil && isEven(*ptr) {
+			result = ptr
+		}
+		_ = result
+	}
+}
+
+// --- Equal vs Direct Comparison ---
+
+func BenchmarkOption_Equal_Int(b *testing.B) {
+	b.ReportAllocs()
+	opt1 := shepard.Some[int](42)
+	opt2 := shepard.Some[int](42)
+	for n := 0; n < b.N; n++ {
+		_ = opt1.Equal(opt2)
+	}
+}
+
+func BenchmarkNative_DirectEqual_Int(b *testing.B) {
+	b.ReportAllocs()
+	val1 := 42
+	val2 := 42
+	ptr1 := &val1
+	ptr2 := &val2
+	for n := 0; n < b.N; n++ {
+		var equal bool
+		if ptr1 != nil && ptr2 != nil {
+			equal = *ptr1 == *ptr2
+		} else {
+			equal = ptr1 == nil && ptr2 == nil
+		}
+		_ = equal
+	}
+}
+
+func BenchmarkOption_Equal_CustomType(b *testing.B) {
+	b.ReportAllocs()
+	opt1 := shepard.Some[testutils.TestType](testutils.TestType{Val: "test"})
+	opt2 := shepard.Some[testutils.TestType](testutils.TestType{Val: "test"})
+	for n := 0; n < b.N; n++ {
+		_ = opt1.Equal(opt2)
+	}
+}
+
+func BenchmarkNative_DirectEqual_CustomType(b *testing.B) {
+	b.ReportAllocs()
+	val1 := testutils.TestType{Val: "test"}
+	val2 := testutils.TestType{Val: "test"}
+	ptr1 := &val1
+	ptr2 := &val2
+	for n := 0; n < b.N; n++ {
+		var equal bool
+		if ptr1 != nil && ptr2 != nil {
+			equal = ptr1.Val == ptr2.Val
+		} else {
+			equal = ptr1 == nil && ptr2 == nil
+		}
+		_ = equal
+	}
+}
+
+// --- Chained Operations ---
+
+func BenchmarkOption_ChainedOps_Int(b *testing.B) {
+	b.ReportAllocs()
+	for n := 0; n < b.N; n++ {
+		opt := shepard.Some[int](n)
+		opt = opt.Filter(func(v *int) bool { return *v%2 == 0 })
+		opt = opt.AndThen(func(v int) shepard.Option[int] { return shepard.Some[int](v * 2) })
+		_ = opt.UnwrapOr(0)
+	}
+}
+
+func BenchmarkNative_ChainedOps_Int(b *testing.B) {
+	b.ReportAllocs()
+	for n := 0; n < b.N; n++ {
+		val := n
+		ptr := &val
+		// Filter: keep if even
+		if ptr != nil && *ptr%2 != 0 {
+			ptr = nil
+		}
+		// Map: double the value
+		if ptr != nil {
+			doubled := *ptr * 2
+			ptr = &doubled
+		}
+		// UnwrapOr
+		var result int
+		if ptr != nil {
+			result = *ptr
+		} else {
+			result = 0
+		}
+		_ = result
+	}
+}
