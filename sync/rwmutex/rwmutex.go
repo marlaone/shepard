@@ -18,27 +18,25 @@ type Guard[T any] struct {
 }
 
 type RWMutex[T any] struct {
-	mutex *sync.RWMutex
+	mutex sync.RWMutex
 	t     T
 }
 
 func New[T any](t T) RWMutex[T] {
-	m := RWMutex[T]{
-		mutex: &sync.RWMutex{},
-		t:     t,
+	return RWMutex[T]{
+		t: t,
 	}
-	return m
 }
 
 func (m *RWMutex[T]) RLock() *LockResult[*T] {
-	m.mutex.Lock()
+	m.mutex.RLock()
 	guard := Guard[*T]{t: &m.t}
 	res := LockResult[*T](shepard.Ok[Guard[*T], error](guard))
 	return &res
 }
 
 func (m *RWMutex[T]) RUnlock() {
-	m.mutex.Unlock()
+	m.mutex.RUnlock()
 }
 
 func (m *RWMutex[T]) Lock() *LockResult[*T] {
