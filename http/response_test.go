@@ -25,7 +25,7 @@ func TestResponse_WithHeader(t *testing.T) {
 
 	result := resp.Headers.Get("Content-Type")
 	assert.True(t, result.IsSome())
-	assert.Equal(t, "application/json", *result.Unwrap())
+	assert.Equal(t, "application/json", result.Unwrap())
 }
 
 func TestResponse_WithBody(t *testing.T) {
@@ -69,7 +69,7 @@ func TestResponseBuilder_Json(t *testing.T) {
 
 	ct := resp.Headers.Get("Content-Type")
 	assert.True(t, ct.IsSome())
-	assert.Equal(t, "application/json", *ct.Unwrap())
+	assert.Equal(t, "application/json", ct.Unwrap())
 }
 
 func TestResponseBuilder_Text(t *testing.T) {
@@ -85,7 +85,7 @@ func TestResponseBuilder_Text(t *testing.T) {
 
 	ct := resp.Headers.Get("Content-Type")
 	assert.True(t, ct.IsSome())
-	assert.Equal(t, "text/plain; charset=utf-8", *ct.Unwrap())
+	assert.Equal(t, "text/plain; charset=utf-8", ct.Unwrap())
 }
 
 func TestResponseBuilder_Html(t *testing.T) {
@@ -99,7 +99,7 @@ func TestResponseBuilder_Html(t *testing.T) {
 
 	ct := resp.Headers.Get("Content-Type")
 	assert.True(t, ct.IsSome())
-	assert.Equal(t, "text/html; charset=utf-8", *ct.Unwrap())
+	assert.Equal(t, "text/html; charset=utf-8", ct.Unwrap())
 }
 
 // Helper function tests
@@ -150,7 +150,7 @@ func TestRedirect(t *testing.T) {
 	assert.Equal(t, StatusFound, resp.StatusCode)
 	loc := resp.Headers.Get("Location")
 	assert.True(t, loc.IsSome())
-	assert.Equal(t, "/new-location", *loc.Unwrap())
+	assert.Equal(t, "/new-location", loc.Unwrap())
 }
 
 func TestPermanentRedirect(t *testing.T) {
@@ -159,7 +159,7 @@ func TestPermanentRedirect(t *testing.T) {
 	assert.Equal(t, StatusPermanentRedirect, resp.StatusCode)
 	loc := resp.Headers.Get("Location")
 	assert.True(t, loc.IsSome())
-	assert.Equal(t, "/permanent", *loc.Unwrap())
+	assert.Equal(t, "/permanent", loc.Unwrap())
 }
 
 func TestNoContent(t *testing.T) {

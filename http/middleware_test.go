@@ -10,11 +10,13 @@ import (
 func TestMiddleware_BeforeHandler(t *testing.T) {
 	var called []string
 
-	mw := func(ctx *Context, next func() shepard.Result[Response, HttpError]) shepard.Result[Response, HttpError] {
-		called = append(called, "middleware:before")
-		result := next()
-		called = append(called, "middleware:after")
-		return result
+	mw := func(next Handler) Handler {
+		return HandlerFunc(func(ctx *Context) shepard.Result[Response, HttpError] {
+			called = append(called, "middleware:before")
+			result := next.Handle(ctx)
+			called = append(called, "middleware:after")
+			return result
+		})
 	}
 
 	router := NewRouter().
@@ -33,10 +35,12 @@ func TestMiddleware_BeforeHandler(t *testing.T) {
 }
 
 func TestMiddleware_ModifyRequest(t *testing.T) {
-	mw := func(ctx *Context, next func() shepard.Result[Response, HttpError]) shepard.Result[Response, HttpError] {
-		// Add a custom header before handling
-		ctx.Request.Headers.Set("X-Request-ID", "123")
-		return next()
+	mw := func(next Handler) Handler {
+		return HandlerFunc(func(ctx *Context) shepard.Result[Response, HttpError] {
+			// Add a custom header before handling
+			ctx.Request.Headers.Set("X-Request-ID", "123")
+			return next.Handle(ctx)
+		})
 	}
 
 	router := NewRouter().
@@ -59,14 +63,16 @@ func TestMiddleware_ModifyRequest(t *testing.T) {
 }
 
 func TestMiddleware_ModifyResponse(t *testing.T) {
-	mw := func(ctx *Context, next func() shepard.Result[Response, HttpError]) shepard.Result[Response, HttpError] {
-		result := next()
-		if result.IsOk() {
-			resp := result.Unwrap()
-			resp.Headers.Set("X-Powered-By", "Shepard")
-			return shepard.Ok[Response, HttpError](resp)
-		}
-		return result
+	mw := func(next Handler) Handler {
+		return HandlerFunc(func(ctx *Context) shepard.Result[Response, HttpError] {
+			result := next.Handle(ctx)
+			if result.IsOk() {
+				resp := result.Unwrap()
+				resp.Headers.Set("X-Powered-By", "Shepard")
+				return shepard.Ok[Response, HttpError](resp)
+			}
+			return result
+		})
 	}
 
 	router := NewRouter().
@@ -84,19 +90,21 @@ func TestMiddleware_ModifyResponse(t *testing.T) {
 	resp := result.Unwrap()
 	powered := resp.Headers.Get("X-Powered-By")
 	assert.True(t, powered.IsSome())
-	assert.Equal(t, "Shepard", *powered.Unwrap())
+	assert.Equal(t, "Shepard", powered.Unwrap())
 }
 
 func TestMiddleware_ShortCircuit(t *testing.T) {
 	var handlerCalled bool
 
-	authMiddleware := func(ctx *Context, next func() shepard.Result[Response, HttpError]) shepard.Result[Response, HttpError] {
-		auth := ctx.Header("Authorization")
-		if auth.IsNone() {
-			// Short-circuit: don't call next()
-			return shepard.Ok[Response, HttpError](TextWithStatus(StatusUnauthorized, "missing auth"))
-		}
-		return next()
+	authMiddleware := func(next Handler) Handler {
+		return HandlerFunc(func(ctx *Context) shepard.Result[Response, HttpError] {
+			auth := ctx.Header("Authorization")
+			if auth.IsNone() {
+				// Short-circuit: don't call next
+				return shepard.Ok[Response, HttpError](TextWithStatus(StatusUnauthorized, "missing auth"))
+			}
+			return next.Handle(ctx)
+		})
 	}
 
 	router := NewRouter().
@@ -121,18 +129,22 @@ func TestMiddleware_ShortCircuit(t *testing.T) {
 func TestMiddleware_MultipleMiddlewares(t *testing.T) {
 	var order []string
 
-	mw1 := func(ctx *Context, next func() shepard.Result[Response, HttpError]) shepard.Result[Response, HttpError] {
-		order = append(order, "mw1:before")
-		result := next()
-		order = append(order, "mw1:after")
-		return result
+	mw1 := func(next Handler) Handler {
+		return HandlerFunc(func(ctx *Context) shepard.Result[Response, HttpError] {
+			order = append(order, "mw1:before")
+			result := next.Handle(ctx)
+			order = append(order, "mw1:after")
+			return result
+		})
 	}
 
-	mw2 := func(ctx *Context, next func() shepard.Result[Response, HttpError]) shepard.Result[Response, HttpError] {
-		order = append(order, "mw2:before")
-		result := next()
-		order = append(order, "mw2:after")
-		return result
+	mw2 := func(next Handler) Handler {
+		return HandlerFunc(func(ctx *Context) shepard.Result[Response, HttpError] {
+			order = append(order, "mw2:before")
+			result := next.Handle(ctx)
+			order = append(order, "mw2:after")
+			return result
+		})
 	}
 
 	router := NewRouter().

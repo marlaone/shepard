@@ -37,7 +37,7 @@ func TestRequest_WithHeader(t *testing.T) {
 
 	result := req.Headers.Get("Content-Type")
 	assert.True(t, result.IsSome())
-	assert.Equal(t, "application/json", *result.Unwrap())
+	assert.Equal(t, "application/json", result.Unwrap())
 }
 
 func TestRequest_Header(t *testing.T) {

@@ -9,26 +9,32 @@ import (
 // This is passed to handlers and provides convenience methods for accessing request data
 type Context struct {
 	Request    Request
-	PathParams hashmap.HashMap[string, string]
-	state      hashmap.HashMap[string, any]
+	pathParams *hashmap.HashMap[string, string] // nil until first path param is set
+	state      *hashmap.HashMap[string, any]    // nil until first state is set
 }
 
 // NewContext creates a new Context from a Request
 func NewContext(req Request) *Context {
 	return &Context{
-		Request:    req,
-		PathParams: hashmap.New[string, string](),
-		state:      hashmap.New[string, any](),
+		Request: req,
+		// pathParams and state are lazy-initialized on first use
 	}
 }
 
 // SetState stores a value in the context state
 func (c *Context) SetState(key string, value any) {
+	if c.state == nil {
+		hm := hashmap.New[string, any]()
+		c.state = &hm
+	}
 	c.state.Insert(key, value)
 }
 
 // GetState retrieves a value from the context state
 func (c *Context) GetState(key string) shepard.Option[any] {
+	if c.state == nil {
+		return shepard.None[any]()
+	}
 	result := c.state.Get(key)
 	if result.IsNone() {
 		return shepard.None[any]()
@@ -38,17 +44,31 @@ func (c *Context) GetState(key string) shepard.Option[any] {
 
 // SetPathParam sets a path parameter (called by router during routing)
 func (c *Context) SetPathParam(key, value string) {
-	c.PathParams.Insert(key, value)
+	if c.pathParams == nil {
+		hm := hashmap.New[string, string]()
+		c.pathParams = &hm
+	}
+	c.pathParams.Insert(key, value)
 }
 
 // Param returns a path parameter by name
 // Returns Option[string] - Some if found, None if not
 func (c *Context) Param(name string) shepard.Option[string] {
-	result := c.PathParams.Get(name)
+	if c.pathParams == nil {
+		return shepard.None[string]()
+	}
+	result := c.pathParams.Get(name)
 	if result.IsNone() {
 		return shepard.None[string]()
 	}
 	return shepard.Some(*result.Unwrap())
+}
+
+// ClearPathParams resets the path parameters for context reuse
+func (c *Context) ClearPathParams() {
+	if c.pathParams != nil {
+		c.pathParams.Clear()
+	}
 }
 
 // Query returns a query parameter by name

@@ -153,9 +153,11 @@ func TestRoute_New(t *testing.T) {
 		return Text("test")
 	})
 
-	route := NewRoute(MethodGet, "/users/:id", handler)
+	// When there's no middleware, handler and chainedHandler are the same
+	route := NewRoute(MethodGet, "/users/:id", handler, handler)
 
 	assert.Equal(t, MethodGet, route.Method)
 	assert.Equal(t, "/users/:id", route.Pattern.Original)
 	assert.NotNil(t, route.Handler)
+	assert.NotNil(t, route.ChainedHandler)
 }

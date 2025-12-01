@@ -75,9 +75,11 @@ func typeKey[T any]() string {
 // WithState creates middleware that injects a value into context state using its type as key
 // This allows handlers to retrieve the value with GetTypedState[T](ctx)
 func WithState[T any](value T) Middleware {
-	return func(ctx *Context, next func() shepard.Result[Response, HttpError]) shepard.Result[Response, HttpError] {
-		SetTypedState(ctx, value)
-		return next()
+	return func(next Handler) Handler {
+		return HandlerFunc(func(ctx *Context) shepard.Result[Response, HttpError] {
+			SetTypedState(ctx, value)
+			return next.Handle(ctx)
+		})
 	}
 }
 
@@ -124,9 +126,11 @@ func NamedStateOr[T any](ctx *Context, name string, defaultVal T) T {
 
 // WithNamedState creates middleware that injects a named value
 func WithNamedState[T any](name string, value T) Middleware {
-	return func(ctx *Context, next func() shepard.Result[Response, HttpError]) shepard.Result[Response, HttpError] {
-		SetNamedState(ctx, name, value)
-		return next()
+	return func(next Handler) Handler {
+		return HandlerFunc(func(ctx *Context) shepard.Result[Response, HttpError] {
+			SetNamedState(ctx, name, value)
+			return next.Handle(ctx)
+		})
 	}
 }
 

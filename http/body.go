@@ -39,9 +39,21 @@ func NewBodyReaderFromBytes(data []byte) *BodyReader {
 	return NewBodyReader(bytes.NewReader(data))
 }
 
-// EmptyBodyReader creates an empty BodyReader
+// emptyBody is a stateless reader that always returns EOF
+type emptyBody struct{}
+
+func (emptyBody) Read([]byte) (int, error) { return 0, io.EOF }
+
+// emptyBodyReader is a shared empty reader - stateless so safe for concurrent use
+var emptyBodyReader = emptyBody{}
+
+// EmptyBodyReader creates an empty BodyReader using the shared stateless reader
 func EmptyBodyReader() *BodyReader {
-	return NewBodyReader(bytes.NewReader(nil))
+	return &BodyReader{
+		reader:    emptyBodyReader,
+		limit:     shepard.None[int64](),
+		bytesRead: 0,
+	}
 }
 
 // Read reads up to len(buf) bytes into buf

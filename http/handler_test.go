@@ -72,7 +72,7 @@ func TestWriterHandlerFunc_Handle(t *testing.T) {
 
 	custom := resp.Headers.Get("X-Custom")
 	assert.True(t, custom.IsSome())
-	assert.Equal(t, "value", *custom.Unwrap())
+	assert.Equal(t, "value", custom.Unwrap())
 }
 
 func TestResponseWriter_WriteHeader(t *testing.T) {
@@ -121,7 +121,7 @@ func TestResponseWriter_Header(t *testing.T) {
 
 	ct := resp.Unwrap().Headers.Get("Content-Type")
 	assert.True(t, ct.IsSome())
-	assert.Equal(t, "application/json", *ct.Unwrap())
+	assert.Equal(t, "application/json", ct.Unwrap())
 }
 
 func TestHandler_Interface(t *testing.T) {

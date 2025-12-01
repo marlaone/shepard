@@ -26,7 +26,7 @@ type Path[T any] struct{}
 func (p Path[T]) Extract(ctx *http.Context, key string) shepard.Result[T, http.HttpError] {
 	paramOpt := ctx.Param(key)
 	if paramOpt.IsNone() {
-		return shepard.Err[T, http.HttpError](
+		return shepard.Err[T](
 			http.BadRequest(fmt.Sprintf("missing path parameter: %s", key)),
 		)
 	}
@@ -58,7 +58,7 @@ type Query[T any] struct{}
 func (q Query[T]) Extract(ctx *http.Context, key string) shepard.Result[T, http.HttpError] {
 	queryOpt := ctx.Query(key)
 	if queryOpt.IsNone() {
-		return shepard.Err[T, http.HttpError](
+		return shepard.Err[T](
 			http.BadRequest(fmt.Sprintf("missing query parameter: %s", key)),
 		)
 	}
@@ -90,7 +90,7 @@ type Header struct{}
 func (h Header) Extract(ctx *http.Context, key string) shepard.Result[string, http.HttpError] {
 	headerOpt := ctx.Header(key)
 	if headerOpt.IsNone() {
-		return shepard.Err[string, http.HttpError](
+		return shepard.Err[string](
 			http.BadRequest(fmt.Sprintf("missing header: %s", key)),
 		)
 	}
@@ -119,7 +119,7 @@ func OptionalHeader(ctx *http.Context, key string) shepard.Option[string] {
 func Json[T any](ctx *http.Context) shepard.Result[T, http.HttpError] {
 	result := http.ContextBodyJson[T](ctx)
 	if result.IsErr() {
-		return shepard.Err[T, http.HttpError](
+		return shepard.Err[T](
 			http.BadRequest(fmt.Sprintf("failed to parse JSON body: %v", result.UnwrapErr())),
 		)
 	}
@@ -132,7 +132,7 @@ func Json[T any](ctx *http.Context) shepard.Result[T, http.HttpError] {
 func Form(ctx *http.Context) shepard.Result[http.FormValues, http.HttpError] {
 	result := http.ContextBodyForm(ctx)
 	if result.IsErr() {
-		return shepard.Err[http.FormValues, http.HttpError](
+		return shepard.Err[http.FormValues](
 			http.BadRequest(fmt.Sprintf("failed to parse form body: %v", result.UnwrapErr())),
 		)
 	}
@@ -145,7 +145,7 @@ func Form(ctx *http.Context) shepard.Result[http.FormValues, http.HttpError] {
 func Multipart(ctx *http.Context) shepard.Result[http.MultipartForm, http.HttpError] {
 	result := http.ContextBodyMultipart(ctx)
 	if result.IsErr() {
-		return shepard.Err[http.MultipartForm, http.HttpError](
+		return shepard.Err[http.MultipartForm](
 			http.BadRequest(fmt.Sprintf("failed to parse multipart form: %v", result.UnwrapErr())),
 		)
 	}
@@ -157,7 +157,7 @@ func MultipartWithLimit(maxMemory int64) func(*http.Context) shepard.Result[http
 	return func(ctx *http.Context) shepard.Result[http.MultipartForm, http.HttpError] {
 		result := http.ContextBodyMultipartWithLimit(ctx, maxMemory)
 		if result.IsErr() {
-			return shepard.Err[http.MultipartForm, http.HttpError](
+			return shepard.Err[http.MultipartForm](
 				http.BadRequest(fmt.Sprintf("failed to parse multipart form: %v", result.UnwrapErr())),
 			)
 		}
@@ -174,16 +174,14 @@ type State[T any] struct{}
 func (s State[T]) Extract(ctx *http.Context, key string) shepard.Result[T, http.HttpError] {
 	stateOpt := ctx.GetState(key)
 	if stateOpt.IsNone() {
-		var zero T
-		return shepard.Err[T, http.HttpError](
+		return shepard.Err[T](
 			http.InternalError(fmt.Errorf("state not found: %s", key)),
 		)
-		_ = zero // avoid unused variable
 	}
 
 	value, ok := stateOpt.Unwrap().(T)
 	if !ok {
-		return shepard.Err[T, http.HttpError](
+		return shepard.Err[T](
 			http.InternalError(fmt.Errorf("state type mismatch for key: %s", key)),
 		)
 	}
@@ -228,19 +226,19 @@ func ExtractCustom[T any](ctx *http.Context, name string) shepard.Result[T, http
 	extractorsMu.RUnlock()
 
 	if !ok {
-		return shepard.Err[T, http.HttpError](
+		return shepard.Err[T](
 			http.InternalError(fmt.Errorf("custom extractor not found: %s", name)),
 		)
 	}
 
 	result := fn(ctx)
 	if result.IsErr() {
-		return shepard.Err[T, http.HttpError](result.UnwrapErr())
+		return shepard.Err[T](result.UnwrapErr())
 	}
 
 	value, ok := result.Unwrap().(T)
 	if !ok {
-		return shepard.Err[T, http.HttpError](
+		return shepard.Err[T](
 			http.InternalError(fmt.Errorf("custom extractor type mismatch: %s", name)),
 		)
 	}
@@ -334,12 +332,12 @@ func parseValue[T any](value string, context string) shepard.Result[T, http.Http
 		}
 
 	default:
-		return shepard.Err[T, http.HttpError](
+		return shepard.Err[T](
 			http.BadRequest(fmt.Sprintf("unsupported type for %s", context)),
 		)
 	}
 
-	return shepard.Err[T, http.HttpError](
+	return shepard.Err[T](
 		http.BadRequest(fmt.Sprintf("failed to parse %s: %v", context, err)),
 	)
 }

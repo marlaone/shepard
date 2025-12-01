@@ -27,7 +27,7 @@ func TestIntoResponse_String(t *testing.T) {
 
 	ct := resp.Headers.Get("Content-Type")
 	assert.True(t, ct.IsSome())
-	assert.Equal(t, "text/plain; charset=utf-8", *ct.Unwrap())
+	assert.Equal(t, "text/plain; charset=utf-8", ct.Unwrap())
 }
 
 func TestIntoResponse_Bytes(t *testing.T) {
@@ -40,7 +40,7 @@ func TestIntoResponse_Bytes(t *testing.T) {
 
 	ct := resp.Headers.Get("Content-Type")
 	assert.True(t, ct.IsSome())
-	assert.Equal(t, "application/octet-stream", *ct.Unwrap())
+	assert.Equal(t, "application/octet-stream", ct.Unwrap())
 }
 
 func TestIntoResponse_StatusString(t *testing.T) {
@@ -93,7 +93,7 @@ func TestJsonResponse(t *testing.T) {
 
 	ct := resp.Headers.Get("Content-Type")
 	assert.True(t, ct.IsSome())
-	assert.Equal(t, "application/json", *ct.Unwrap())
+	assert.Equal(t, "application/json", ct.Unwrap())
 }
 
 func TestJsonResponseWithStatus(t *testing.T) {
@@ -111,7 +111,7 @@ func TestHtmlResponse(t *testing.T) {
 
 	ct := resp.Headers.Get("Content-Type")
 	assert.True(t, ct.IsSome())
-	assert.Equal(t, "text/html; charset=utf-8", *ct.Unwrap())
+	assert.Equal(t, "text/html; charset=utf-8", ct.Unwrap())
 }
 
 // FileResponse tests
@@ -128,12 +128,12 @@ func TestFileResponse_Attachment(t *testing.T) {
 	// Check Content-Type (defaults to application/octet-stream)
 	ct := resp.Headers.Get("Content-Type")
 	assert.True(t, ct.IsSome())
-	assert.Equal(t, "application/octet-stream", *ct.Unwrap())
+	assert.Equal(t, "application/octet-stream", ct.Unwrap())
 
 	// Check Content-Disposition (attachment)
 	cd := resp.Headers.Get("Content-Disposition")
 	assert.True(t, cd.IsSome())
-	assert.Equal(t, `attachment; filename="document.txt"`, *cd.Unwrap())
+	assert.Equal(t, `attachment; filename="document.txt"`, cd.Unwrap())
 }
 
 func TestFileResponse_WithContentType(t *testing.T) {
@@ -144,11 +144,11 @@ func TestFileResponse_WithContentType(t *testing.T) {
 
 	ct := resp.Headers.Get("Content-Type")
 	assert.True(t, ct.IsSome())
-	assert.Equal(t, "application/pdf", *ct.Unwrap())
+	assert.Equal(t, "application/pdf", ct.Unwrap())
 
 	cd := resp.Headers.Get("Content-Disposition")
 	assert.True(t, cd.IsSome())
-	assert.Equal(t, `attachment; filename="report.pdf"`, *cd.Unwrap())
+	assert.Equal(t, `attachment; filename="report.pdf"`, cd.Unwrap())
 }
 
 func TestFileResponse_Inline(t *testing.T) {
@@ -159,12 +159,12 @@ func TestFileResponse_Inline(t *testing.T) {
 
 	ct := resp.Headers.Get("Content-Type")
 	assert.True(t, ct.IsSome())
-	assert.Equal(t, "image/svg+xml", *ct.Unwrap())
+	assert.Equal(t, "image/svg+xml", ct.Unwrap())
 
 	// Inline files use inline disposition
 	cd := resp.Headers.Get("Content-Disposition")
 	assert.True(t, cd.IsSome())
-	assert.Equal(t, `inline; filename="image.svg"`, *cd.Unwrap())
+	assert.Equal(t, `inline; filename="image.svg"`, cd.Unwrap())
 }
 
 func TestFileResponse_FilenameEscaping(t *testing.T) {
@@ -177,5 +177,5 @@ func TestFileResponse_FilenameEscaping(t *testing.T) {
 	cd := resp.Headers.Get("Content-Disposition")
 	assert.True(t, cd.IsSome())
 	// Quote should be escaped
-	assert.Equal(t, `attachment; filename="test\"file.txt"`, *cd.Unwrap())
+	assert.Equal(t, `attachment; filename="test\"file.txt"`, cd.Unwrap())
 }

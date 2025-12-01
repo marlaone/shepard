@@ -21,8 +21,8 @@ func TestJsonOk(t *testing.T) {
 	if contentType.IsNone() {
 		t.Fatal("expected Content-Type header")
 	}
-	if *contentType.Unwrap() != "application/json" {
-		t.Errorf("expected application/json, got %s", *contentType.Unwrap())
+	if contentType.Unwrap() != "application/json" {
+		t.Errorf("expected application/json, got %s", contentType.Unwrap())
 	}
 }
 
@@ -113,8 +113,8 @@ func TestHtmlOk(t *testing.T) {
 	if contentType.IsNone() {
 		t.Fatal("expected Content-Type header")
 	}
-	if *contentType.Unwrap() != "text/html; charset=utf-8" {
-		t.Errorf("expected text/html, got %s", *contentType.Unwrap())
+	if contentType.Unwrap() != "text/html; charset=utf-8" {
+		t.Errorf("expected text/html, got %s", contentType.Unwrap())
 	}
 }
 
@@ -147,8 +147,8 @@ func TestCreatedOk(t *testing.T) {
 	if location.IsNone() {
 		t.Fatal("expected Location header")
 	}
-	if *location.Unwrap() != "/users/123" {
-		t.Errorf("expected /users/123, got %s", *location.Unwrap())
+	if location.Unwrap() != "/users/123" {
+		t.Errorf("expected /users/123, got %s", location.Unwrap())
 	}
 }
 
@@ -168,8 +168,8 @@ func TestRedirectOk(t *testing.T) {
 	if location.IsNone() {
 		t.Fatal("expected Location header")
 	}
-	if *location.Unwrap() != "https://example.com" {
-		t.Errorf("expected https://example.com, got %s", *location.Unwrap())
+	if location.Unwrap() != "https://example.com" {
+		t.Errorf("expected https://example.com, got %s", location.Unwrap())
 	}
 }
 

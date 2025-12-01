@@ -2,23 +2,44 @@ package http
 
 import (
 	"github.com/marlaone/shepard"
-	"github.com/marlaone/shepard/collections/slice"
 )
 
 // Router is the main HTTP router that matches requests to handlers
 type Router struct {
-	routes          slice.Slice[Route]
-	middleware      slice.Slice[Middleware]
-	notFoundHandler Handler
+	tree                    *RadixTree // Radix tree for O(k) route lookup
+	middleware              []Middleware
+	notFoundHandler         Handler
+	chainedNotFound         Handler // Pre-computed 404 with middleware
+	chainedMethodNotAllowed Handler // Pre-computed 405 with middleware
 }
 
 // NewRouter creates a new Router
 func NewRouter() *Router {
+	notFound := defaultNotFoundHandler()
+	methodNotAllowed := defaultMethodNotAllowedHandler()
 	return &Router{
-		routes:          slice.New[Route](),
-		middleware:      slice.New[Middleware](),
-		notFoundHandler: defaultNotFoundHandler(),
+		tree:                    NewRadixTree(),
+		middleware:              nil,
+		notFoundHandler:         notFound,
+		chainedNotFound:         notFound,
+		chainedMethodNotAllowed: methodNotAllowed,
 	}
+}
+
+// buildChain wraps handler with all middleware (called at registration, not per-request)
+func (r *Router) buildChain(handler Handler) Handler {
+	result := handler
+	// Apply in reverse order (last middleware = outermost)
+	for i := len(r.middleware) - 1; i >= 0; i-- {
+		result = r.middleware[i](result)
+	}
+	return result
+}
+
+// rebuildDefaultChains rebuilds pre-computed chains for 404/405 handlers
+func (r *Router) rebuildDefaultChains() {
+	r.chainedNotFound = r.buildChain(r.notFoundHandler)
+	r.chainedMethodNotAllowed = r.buildChain(defaultMethodNotAllowedHandler())
 }
 
 // defaultNotFoundHandler returns the default 404 handler
@@ -37,8 +58,12 @@ func defaultMethodNotAllowedHandler() Handler {
 
 // Route adds a route with the given method, pattern, and handler
 func (r *Router) Route(method Method, pattern string, handler Handler) *Router {
-	route := NewRoute(method, pattern, handler)
-	r.routes.Push(route)
+	// Pre-compute the middleware chain at registration time
+	chainedHandler := r.buildChain(handler)
+
+	// Insert into radix tree for O(k) lookup
+	r.tree.Insert(method, pattern, handler, chainedHandler)
+
 	return r
 }
 
@@ -80,36 +105,25 @@ func (r *Router) Options(pattern string, handler Handler) *Router {
 // NotFound sets a custom 404 handler
 func (r *Router) NotFound(handler Handler) *Router {
 	r.notFoundHandler = handler
+	r.rebuildDefaultChains()
 	return r
 }
 
 // Use adds a middleware to the router
+// NOTE: Middleware must be added BEFORE routes for them to be applied
 func (r *Router) Use(mw Middleware) *Router {
-	r.middleware.Push(mw)
+	r.middleware = append(r.middleware, mw)
+	r.rebuildDefaultChains()
 	return r
 }
 
 // Handle processes a request through the router
 func (r *Router) Handle(ctx *Context) shepard.Result[Response, HttpError] {
-	// Build the handler chain with middleware
+	// Find the pre-computed handler chain (no per-request allocations)
 	handler := r.findHandler(ctx)
 
-	// Apply middleware in reverse order (last added = outermost)
-	for i := r.middleware.Len() - 1; i >= 0; i-- {
-		mwOpt := r.middleware.Get(i)
-		if mwOpt.IsSome() {
-			mw := *mwOpt.Unwrap()
-			capturedHandler := handler
-			handler = func(ctx *Context) shepard.Result[Response, HttpError] {
-				return mw(ctx, func() shepard.Result[Response, HttpError] {
-					return capturedHandler(ctx)
-				})
-			}
-		}
-	}
-
 	// Execute the handler chain
-	result := handler(ctx)
+	result := handler.Handle(ctx)
 
 	// Convert HttpError to Response if needed
 	if result.IsErr() {
@@ -121,67 +135,33 @@ func (r *Router) Handle(ctx *Context) shepard.Result[Response, HttpError] {
 }
 
 // findHandler finds the matching handler for a request
-func (r *Router) findHandler(ctx *Context) func(*Context) shepard.Result[Response, HttpError] {
+// Uses radix tree for O(k) lookup where k = path length
+func (r *Router) findHandler(ctx *Context) Handler {
 	path := ctx.Path()
 	method := ctx.Method()
 
-	// Check if any route matches the path (regardless of method)
-	var pathMatchFound bool
-	var matchedRoute *Route
+	// Radix tree lookup
+	node, params := r.tree.Lookup(method, path)
 
-	// Find matching route
-	routeIter := r.routes.Iter()
-	for {
-		routeOpt := routeIter.Next()
-		if routeOpt.IsNone() {
-			break
+	if node != nil && node.chainedHandler != nil {
+		// Copy params to context
+		for _, p := range params {
+			ctx.SetPathParam(p.Name, p.Value)
 		}
-		route := routeOpt.Unwrap()
-
-		// Check if path matches (regardless of method)
-		pathParams := route.Pattern.Match(path)
-		if pathParams.IsSome() {
-			pathMatchFound = true
-
-			// Check if method also matches
-			if route.Method == method {
-				matchedRoute = &route
-
-				// Copy params to context
-				params := pathParams.Unwrap()
-				params.KeysUnordered().Foreach(func(_ int, key string) {
-					valOpt := params.Get(key)
-					if valOpt.IsSome() {
-						ctx.SetPathParam(key, *valOpt.Unwrap())
-					}
-				})
-
-				break
-			}
-		}
+		return node.chainedHandler
 	}
 
-	if matchedRoute != nil {
-		return func(ctx *Context) shepard.Result[Response, HttpError] {
-			return matchedRoute.Handler.Handle(ctx)
-		}
+	// Check for 405 (path exists but wrong method)
+	if r.tree.PathExistsAnyMethod(path) {
+		return r.chainedMethodNotAllowed
 	}
 
-	// Path matched but method didn't
-	if pathMatchFound {
-		return func(ctx *Context) shepard.Result[Response, HttpError] {
-			return defaultMethodNotAllowedHandler().Handle(ctx)
-		}
-	}
-
-	// No route found
-	return func(ctx *Context) shepard.Result[Response, HttpError] {
-		return r.notFoundHandler.Handle(ctx)
-	}
+	return r.chainedNotFound
 }
 
-// Middleware is a function that wraps a handler
-type Middleware func(ctx *Context, next func() shepard.Result[Response, HttpError]) shepard.Result[Response, HttpError]
+// Middleware wraps a Handler and returns a new Handler
+// Pre-computes the chain at route registration time (zero per-request allocations)
+type Middleware func(next Handler) Handler
 
 // --- Route Groups ---
 
@@ -189,7 +169,7 @@ type Middleware func(ctx *Context, next func() shepard.Result[Response, HttpErro
 type RouteGroup struct {
 	router     *Router
 	prefix     string
-	middleware slice.Slice[Middleware]
+	middleware []Middleware
 }
 
 // Group creates a new route group with the given prefix
@@ -198,14 +178,14 @@ func (r *Router) Group(prefix string) *RouteGroup {
 	return &RouteGroup{
 		router:     r,
 		prefix:     prefix,
-		middleware: slice.New[Middleware](),
+		middleware: nil,
 	}
 }
 
 // Use adds middleware to this group only
 // Middleware is applied to all routes added to this group
 func (g *RouteGroup) Use(mw Middleware) *RouteGroup {
-	g.middleware.Push(mw)
+	g.middleware = append(g.middleware, mw)
 	return g
 }
 
@@ -252,10 +232,13 @@ func (g *RouteGroup) Options(pattern string, handler Handler) *RouteGroup {
 
 // Group creates a nested group with an additional prefix
 func (g *RouteGroup) Group(prefix string) *RouteGroup {
+	// Clone middleware slice
+	mwCopy := make([]Middleware, len(g.middleware))
+	copy(mwCopy, g.middleware)
 	return &RouteGroup{
 		router:     g.router,
 		prefix:     g.prefix + prefix,
-		middleware: g.middleware.Clone(),
+		middleware: mwCopy,
 	}
 }
 
@@ -263,26 +246,12 @@ func (g *RouteGroup) Group(prefix string) *RouteGroup {
 func (g *RouteGroup) addRoute(method Method, pattern string, handler Handler) {
 	fullPattern := g.prefix + pattern
 
-	// If no group middleware, add route directly
-	if g.middleware.Len() == 0 {
-		g.router.Route(method, fullPattern, handler)
-		return
-	}
-
-	// Wrap handler with group middleware (innermost to outermost)
+	// Apply group middleware to handler (innermost to outermost)
 	wrappedHandler := handler
-	for i := g.middleware.Len() - 1; i >= 0; i-- {
-		mwOpt := g.middleware.Get(i)
-		if mwOpt.IsSome() {
-			mw := *mwOpt.Unwrap()
-			capturedHandler := wrappedHandler
-			wrappedHandler = HandlerFunc(func(ctx *Context) shepard.Result[Response, HttpError] {
-				return mw(ctx, func() shepard.Result[Response, HttpError] {
-					return capturedHandler.Handle(ctx)
-				})
-			})
-		}
+	for i := len(g.middleware) - 1; i >= 0; i-- {
+		wrappedHandler = g.middleware[i](wrappedHandler)
 	}
 
+	// Then router's buildChain will apply global middleware
 	g.router.Route(method, fullPattern, wrappedHandler)
 }

@@ -2,6 +2,7 @@ package http
 
 import (
 	"strings"
+	"sync"
 
 	"github.com/marlaone/shepard"
 	"github.com/marlaone/shepard/collections/hashmap"
@@ -123,19 +124,25 @@ type HeaderEntry struct {
 // headerValue stores the original key case and values
 type headerValue struct {
 	originalKey string
-	values      slice.Slice[string]
+	values      []string // Native slice for performance
 }
 
 // Headers stores HTTP headers with case-insensitive keys
-// Uses HashMap internally for efficient lookups
+// Uses native Go map internally for fast parsing, with lazy HashMap conversion for Entry API
 type Headers struct {
-	headers hashmap.HashMap[string, headerValue]
+	// Native map for hot path (parsing, Get, Set, Append)
+	// Stores headerValue by value to avoid heap allocation per header
+	data map[string]headerValue
+
+	// Lazy-loaded HashMap for Entry API access
+	hashmap     *hashmap.HashMap[string, headerValue]
+	hashmapOnce sync.Once
 }
 
 // NewHeaders creates a new empty Headers
 func NewHeaders() *Headers {
 	return &Headers{
-		headers: hashmap.New[string, headerValue](),
+		data: make(map[string]headerValue, 8), // Pre-allocate for typical header count
 	}
 }
 
@@ -151,106 +158,125 @@ func canonicalKey(key string) string {
 // Set sets a header value, replacing any existing values
 func (h *Headers) Set(key, value string) {
 	canonical := canonicalKey(key)
-	hv := headerValue{
+	h.data[canonical] = headerValue{
 		originalKey: key,
-		values:      slice.Init(value),
+		values:      []string{value},
 	}
-	h.headers.Insert(canonical, hv)
 }
 
 // Get returns the first value for the given header key
-// Returns Option[*string] - Some if found, None if not
-func (h *Headers) Get(key string) shepard.Option[*string] {
+// Returns Option[string] - Some if found, None if not
+func (h *Headers) Get(key string) shepard.Option[string] {
 	canonical := canonicalKey(key)
-	hvOpt := h.headers.Get(canonical)
-	if hvOpt.IsNone() {
-		return shepard.None[*string]()
+	if hv, ok := h.data[canonical]; ok && len(hv.values) > 0 {
+		return shepard.Some(hv.values[0])
 	}
-	hv := hvOpt.Unwrap()
-	return hv.values.First()
+	return shepard.None[string]()
 }
 
 // GetAll returns all values for the given header key
 func (h *Headers) GetAll(key string) slice.Slice[string] {
 	canonical := canonicalKey(key)
-	hvOpt := h.headers.Get(canonical)
-	if hvOpt.IsNone() {
-		return slice.New[string]()
+	if hv, ok := h.data[canonical]; ok {
+		// Return a copy as slice.Slice
+		return slice.Init(hv.values...)
 	}
-	return hvOpt.Unwrap().values
+	return slice.New[string]()
 }
 
 // Append adds a value to the header, keeping existing values
 func (h *Headers) Append(key, value string) {
 	canonical := canonicalKey(key)
-	entry := h.headers.Entry(canonical)
-	if entry.IsOccupied() {
-		entry.AndModify(func(hv *headerValue) {
-			hv.values.Push(value)
-		})
+	if hv, ok := h.data[canonical]; ok {
+		hv.values = append(hv.values, value)
+		h.data[canonical] = hv // Reassign since map values aren't addressable
 	} else {
-		entry.OrInsert(headerValue{
+		h.data[canonical] = headerValue{
 			originalKey: key,
-			values:      slice.Init(value),
-		})
+			values:      []string{value},
+		}
 	}
 }
 
 // Remove removes a header by key
 func (h *Headers) Remove(key string) {
 	canonical := canonicalKey(key)
-	h.headers.Remove(canonical)
+	delete(h.data, canonical)
 }
 
 // Contains returns true if the header exists
 func (h *Headers) Contains(key string) bool {
 	canonical := canonicalKey(key)
-	return h.headers.ContainsKey(canonical)
+	_, ok := h.data[canonical]
+	return ok
 }
 
 // Len returns the number of unique header keys
 func (h *Headers) Len() int {
-	return h.headers.Len()
+	return len(h.data)
 }
 
 // Clone creates a deep copy of the headers
 func (h *Headers) Clone() *Headers {
-	cloned := NewHeaders()
-	h.headers.Iter().Foreach(func(_ int, pair hashmap.Pair[*string, *headerValue]) {
-		// Clone the values slice
-		clonedValues := slice.WithCapacity[string](pair.Value.values.Len())
-		pair.Value.values.Iter().Foreach(func(_ int, v string) {
-			clonedValues.Push(v)
-		})
-		cloned.headers.Insert(*pair.Key, headerValue{
-			originalKey: pair.Value.originalKey,
-			values:      clonedValues,
-		})
-	})
+	cloned := &Headers{
+		data: make(map[string]headerValue, len(h.data)),
+	}
+	for k, v := range h.data {
+		// Deep copy the values slice
+		valuesCopy := make([]string, len(v.values))
+		copy(valuesCopy, v.values)
+		cloned.data[k] = headerValue{
+			originalKey: v.originalKey,
+			values:      valuesCopy,
+		}
+	}
 	return cloned
 }
 
 // Iter returns an iterator over all header entries
 func (h *Headers) Iter() iter.Iter[HeaderEntry] {
-	entries := slice.New[HeaderEntry]()
-	h.headers.Iter().Foreach(func(_ int, pair hashmap.Pair[*string, *headerValue]) {
-		pair.Value.values.Iter().Foreach(func(_ int, value string) {
-			entries.Push(HeaderEntry{
-				Key:   pair.Value.originalKey,
+	entries := make([]HeaderEntry, 0, len(h.data))
+	for _, hv := range h.data {
+		for _, value := range hv.values {
+			entries = append(entries, HeaderEntry{
+				Key:   hv.originalKey,
 				Value: value,
 			})
-		})
-	})
-	return entries.Iter()
+		}
+	}
+	return iter.New(entries)
 }
 
 // Foreach iterates over all header keys and their values
 func (h *Headers) Foreach(fn func(key string, values []string)) {
-	h.headers.Iter().Foreach(func(_ int, pair hashmap.Pair[*string, *headerValue]) {
-		values := make([]string, pair.Value.values.Len())
-		pair.Value.values.Iter().Foreach(func(i int, v string) {
-			values[i] = v
-		})
-		fn(pair.Value.originalKey, values)
+	for _, hv := range h.data {
+		fn(hv.originalKey, hv.values)
+	}
+}
+
+// Entry provides HashMap Entry API access for advanced use cases.
+// This lazily initializes a HashMap from the native map data.
+// Note: Mutations through Entry will modify the HashMap, not the native map.
+// After calling Entry(), the Headers switches to HashMap mode for consistency.
+func (h *Headers) Entry(key string) hashmap.Entry[string, headerValue] {
+	h.ensureHashMap()
+	return h.hashmap.Entry(canonicalKey(key))
+}
+
+// ensureHashMap lazily initializes the HashMap from native map data
+func (h *Headers) ensureHashMap() {
+	h.hashmapOnce.Do(func() {
+		hm := hashmap.WithCapacity[string, headerValue](len(h.data))
+		for k, v := range h.data {
+			hm.Insert(k, v)
+		}
+		h.hashmap = &hm
 	})
+}
+
+// AsHashMap returns the headers as a HashMap for advanced operations.
+// This lazily initializes the HashMap if not already done.
+func (h *Headers) AsHashMap() *hashmap.HashMap[string, headerValue] {
+	h.ensureHashMap()
+	return h.hashmap
 }

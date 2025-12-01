@@ -49,11 +49,7 @@ func (r Request) WithHeader(key, value string) Request {
 // Header returns the value of the given header
 // Returns Option[string] - Some if found, None if not
 func (r Request) Header(key string) shepard.Option[string] {
-	result := r.Headers.Get(key)
-	if result.IsNone() {
-		return shepard.None[string]()
-	}
-	return shepard.Some(*result.Unwrap())
+	return r.Headers.Get(key)
 }
 
 // Query returns the value of a query parameter

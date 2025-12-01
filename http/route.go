@@ -236,13 +236,15 @@ func (rp RoutePattern) Match(path string) shepard.Option[hashmap.HashMap[string,
 
 // Route represents a single route with method, pattern, and handler
 type Route struct {
-	Method  Method
-	Pattern RoutePattern
-	Handler Handler
+	Method         Method
+	Pattern        RoutePattern
+	Handler        Handler // Original handler
+	ChainedHandler Handler // Pre-computed: middleware chain + handler
 }
 
 // NewRoute creates a new Route
-func NewRoute(method Method, pattern string, handler Handler) Route {
+// chainedHandler should be the handler with middleware pre-applied
+func NewRoute(method Method, pattern string, handler Handler, chainedHandler Handler) Route {
 	patternResult := ParsePattern(pattern)
 	pat := RoutePattern{Original: pattern, Segments: slice.New[Segment]()}
 	if patternResult.IsOk() {
@@ -250,9 +252,10 @@ func NewRoute(method Method, pattern string, handler Handler) Route {
 	}
 
 	return Route{
-		Method:  method,
-		Pattern: pat,
-		Handler: handler,
+		Method:         method,
+		Pattern:        pat,
+		Handler:        handler,
+		ChainedHandler: chainedHandler,
 	}
 }
 

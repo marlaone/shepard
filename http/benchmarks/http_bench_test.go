@@ -570,7 +570,7 @@ func BenchmarkRouter_Match_WithParams_1Param(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		ctx.PathParams.Clear()
+		ctx.ClearPathParams()
 		_ = router.Handle(ctx)
 	}
 }
@@ -585,7 +585,7 @@ func BenchmarkRouter_Match_WithParams_3Params(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		ctx.PathParams.Clear()
+		ctx.ClearPathParams()
 		_ = router.Handle(ctx)
 	}
 }
@@ -664,8 +664,10 @@ func BenchmarkHandler_WriterFunc(b *testing.B) {
 
 func BenchmarkHandler_WithMiddleware_1(b *testing.B) {
 	router := http.NewRouter()
-	router.Use(func(ctx *http.Context, next func() shepard.Result[http.Response, http.HttpError]) shepard.Result[http.Response, http.HttpError] {
-		return next()
+	router.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(ctx *http.Context) shepard.Result[http.Response, http.HttpError] {
+			return next.Handle(ctx)
+		})
 	})
 	router.Get("/", http.SimpleHandlerFunc(func(ctx *http.Context) http.Response {
 		return http.Text("ok")
@@ -682,8 +684,10 @@ func BenchmarkHandler_WithMiddleware_1(b *testing.B) {
 func BenchmarkHandler_WithMiddleware_5(b *testing.B) {
 	router := http.NewRouter()
 	for j := 0; j < 5; j++ {
-		router.Use(func(ctx *http.Context, next func() shepard.Result[http.Response, http.HttpError]) shepard.Result[http.Response, http.HttpError] {
-			return next()
+		router.Use(func(next http.Handler) http.Handler {
+			return http.HandlerFunc(func(ctx *http.Context) shepard.Result[http.Response, http.HttpError] {
+				return next.Handle(ctx)
+			})
 		})
 	}
 	router.Get("/", http.SimpleHandlerFunc(func(ctx *http.Context) http.Response {
@@ -701,8 +705,10 @@ func BenchmarkHandler_WithMiddleware_5(b *testing.B) {
 func BenchmarkHandler_WithMiddleware_10(b *testing.B) {
 	router := http.NewRouter()
 	for j := 0; j < 10; j++ {
-		router.Use(func(ctx *http.Context, next func() shepard.Result[http.Response, http.HttpError]) shepard.Result[http.Response, http.HttpError] {
-			return next()
+		router.Use(func(next http.Handler) http.Handler {
+			return http.HandlerFunc(func(ctx *http.Context) shepard.Result[http.Response, http.HttpError] {
+				return next.Handle(ctx)
+			})
 		})
 	}
 	router.Get("/", http.SimpleHandlerFunc(func(ctx *http.Context) http.Response {
@@ -960,17 +966,21 @@ func BenchmarkFullCycle_PostJSON_Large(b *testing.B) {
 func BenchmarkFullCycle_WithMiddleware(b *testing.B) {
 	router := http.NewRouter()
 	// Add logging-like middleware
-	router.Use(func(ctx *http.Context, next func() shepard.Result[http.Response, http.HttpError]) shepard.Result[http.Response, http.HttpError] {
-		// Simulate logging setup
-		_ = ctx.Method()
-		_ = ctx.Path()
-		return next()
+	router.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(ctx *http.Context) shepard.Result[http.Response, http.HttpError] {
+			// Simulate logging setup
+			_ = ctx.Method()
+			_ = ctx.Path()
+			return next.Handle(ctx)
+		})
 	})
 	// Add auth-like middleware
-	router.Use(func(ctx *http.Context, next func() shepard.Result[http.Response, http.HttpError]) shepard.Result[http.Response, http.HttpError] {
-		// Simulate auth check
-		_ = ctx.Header("Authorization")
-		return next()
+	router.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(ctx *http.Context) shepard.Result[http.Response, http.HttpError] {
+			// Simulate auth check
+			_ = ctx.Header("Authorization")
+			return next.Handle(ctx)
+		})
 	})
 	router.Get("/", http.SimpleHandlerFunc(func(ctx *http.Context) http.Response {
 		return http.Text("ok")

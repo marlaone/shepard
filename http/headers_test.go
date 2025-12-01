@@ -21,7 +21,7 @@ func TestHeaders_Set_Get(t *testing.T) {
 	// Get it back
 	result := h.Get("Content-Type")
 	assert.True(t, result.IsSome())
-	assert.Equal(t, "application/json", *result.Unwrap())
+	assert.Equal(t, "application/json", result.Unwrap())
 }
 
 func TestHeaders_Get_CaseInsensitive(t *testing.T) {
@@ -31,11 +31,11 @@ func TestHeaders_Get_CaseInsensitive(t *testing.T) {
 	// Should be case-insensitive
 	result := h.Get("content-type")
 	assert.True(t, result.IsSome())
-	assert.Equal(t, "application/json", *result.Unwrap())
+	assert.Equal(t, "application/json", result.Unwrap())
 
 	result = h.Get("CONTENT-TYPE")
 	assert.True(t, result.IsSome())
-	assert.Equal(t, "application/json", *result.Unwrap())
+	assert.Equal(t, "application/json", result.Unwrap())
 }
 
 func TestHeaders_Get_NotFound(t *testing.T) {
@@ -97,7 +97,7 @@ func TestHeaders_Clone(t *testing.T) {
 	// Clone should be unchanged
 	result := cloned.Get("Content-Type")
 	assert.True(t, result.IsSome())
-	assert.Equal(t, "application/json", *result.Unwrap())
+	assert.Equal(t, "application/json", result.Unwrap())
 }
 
 func TestHeaders_Iter(t *testing.T) {

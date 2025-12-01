@@ -265,9 +265,11 @@ func TestRouteGroup_WithMiddleware(t *testing.T) {
 	router := NewRouter()
 
 	var middlewareCalled bool
-	authMiddleware := func(ctx *Context, next func() shepard.Result[Response, HttpError]) shepard.Result[Response, HttpError] {
-		middlewareCalled = true
-		return next()
+	authMiddleware := func(next Handler) Handler {
+		return HandlerFunc(func(ctx *Context) shepard.Result[Response, HttpError] {
+			middlewareCalled = true
+			return next.Handle(ctx)
+		})
 	}
 
 	api := router.Group("/api")
@@ -289,9 +291,11 @@ func TestRouteGroup_WithMiddleware(t *testing.T) {
 func TestRouteGroup_MiddlewareRejects(t *testing.T) {
 	router := NewRouter()
 
-	authMiddleware := func(ctx *Context, next func() shepard.Result[Response, HttpError]) shepard.Result[Response, HttpError] {
-		// Reject - don't call next
-		return shepard.Ok[Response, HttpError](TextWithStatus(StatusUnauthorized, "unauthorized"))
+	authMiddleware := func(next Handler) Handler {
+		return HandlerFunc(func(ctx *Context) shepard.Result[Response, HttpError] {
+			// Reject - don't call next
+			return shepard.Ok[Response, HttpError](TextWithStatus(StatusUnauthorized, "unauthorized"))
+		})
 	}
 
 	api := router.Group("/api")
@@ -315,18 +319,22 @@ func TestRouteGroup_MultipleMiddleware(t *testing.T) {
 
 	var order []string
 
-	mw1 := func(ctx *Context, next func() shepard.Result[Response, HttpError]) shepard.Result[Response, HttpError] {
-		order = append(order, "mw1-before")
-		result := next()
-		order = append(order, "mw1-after")
-		return result
+	mw1 := func(next Handler) Handler {
+		return HandlerFunc(func(ctx *Context) shepard.Result[Response, HttpError] {
+			order = append(order, "mw1-before")
+			result := next.Handle(ctx)
+			order = append(order, "mw1-after")
+			return result
+		})
 	}
 
-	mw2 := func(ctx *Context, next func() shepard.Result[Response, HttpError]) shepard.Result[Response, HttpError] {
-		order = append(order, "mw2-before")
-		result := next()
-		order = append(order, "mw2-after")
-		return result
+	mw2 := func(next Handler) Handler {
+		return HandlerFunc(func(ctx *Context) shepard.Result[Response, HttpError] {
+			order = append(order, "mw2-before")
+			result := next.Handle(ctx)
+			order = append(order, "mw2-after")
+			return result
+		})
 	}
 
 	api := router.Group("/api")
@@ -382,15 +390,19 @@ func TestRouteGroup_NestedMiddleware(t *testing.T) {
 	var calls []string
 
 	api := router.Group("/api")
-	api.Use(func(ctx *Context, next func() shepard.Result[Response, HttpError]) shepard.Result[Response, HttpError] {
-		calls = append(calls, "api-mw")
-		return next()
+	api.Use(func(next Handler) Handler {
+		return HandlerFunc(func(ctx *Context) shepard.Result[Response, HttpError] {
+			calls = append(calls, "api-mw")
+			return next.Handle(ctx)
+		})
 	})
 
 	v1 := api.Group("/v1")
-	v1.Use(func(ctx *Context, next func() shepard.Result[Response, HttpError]) shepard.Result[Response, HttpError] {
-		calls = append(calls, "v1-mw")
-		return next()
+	v1.Use(func(next Handler) Handler {
+		return HandlerFunc(func(ctx *Context) shepard.Result[Response, HttpError] {
+			calls = append(calls, "v1-mw")
+			return next.Handle(ctx)
+		})
 	})
 
 	v1.Get("/test", SimpleHandlerFunc(func(ctx *Context) Response {
@@ -432,8 +444,10 @@ func TestRouteGroup_ChainedMethods(t *testing.T) {
 
 	// Test fluent API
 	router.Group("/api").
-		Use(func(ctx *Context, next func() shepard.Result[Response, HttpError]) shepard.Result[Response, HttpError] {
-			return next()
+		Use(func(next Handler) Handler {
+			return HandlerFunc(func(ctx *Context) shepard.Result[Response, HttpError] {
+				return next.Handle(ctx)
+			})
 		}).
 		Get("/users", SimpleHandlerFunc(func(ctx *Context) Response { return Text("users") })).
 		Post("/users", SimpleHandlerFunc(func(ctx *Context) Response { return Text("create") })).

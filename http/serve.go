@@ -7,12 +7,29 @@ import (
 	"net"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/marlaone/shepard"
 )
 
+// bufioReaderPool reuses bufio.Reader instances to reduce allocations
+var bufioReaderPool = sync.Pool{
+	New: func() any { return bufio.NewReaderSize(nil, 4096) },
+}
+
+// responseBufPool reuses byte buffers for writing HTTP responses
+var responseBufPool = sync.Pool{
+	New: func() any { return make([]byte, 0, 512) },
+}
+
+// maxPooledBufSize is the maximum buffer size to return to the pool
+// Larger buffers are left for GC to prevent memory bloat
+const maxPooledBufSize = 64 * 1024 // 64KB
+
 // ParseHTTPRequest parses an HTTP/1.1 request from a reader
 func ParseHTTPRequest(reader io.Reader) shepard.Result[Request, error] {
+	// Note: bufioReaderPool is available but disabled for now
+	// due to issues with POST requests where body isn't read
 	bufReader := bufio.NewReader(reader)
 
 	// Read request line
@@ -66,9 +83,8 @@ func ParseHTTPRequest(reader io.Reader) shepard.Result[Request, error] {
 	var bodyReader *BodyReader
 	contentLengthOpt := headers.Get("Content-Length")
 	if contentLengthOpt.IsSome() {
-		contentLength, err := strconv.ParseInt(*contentLengthOpt.Unwrap(), 10, 64)
+		contentLength, err := strconv.ParseInt(contentLengthOpt.Unwrap(), 10, 64)
 		if err == nil && contentLength > 0 {
-			// Read body with limit
 			bodyReader = NewBodyReaderWithLimit(bufReader, contentLength)
 		} else {
 			bodyReader = EmptyBodyReader()
@@ -85,32 +101,53 @@ func ParseHTTPRequest(reader io.Reader) shepard.Result[Request, error] {
 
 // WriteHTTPResponse writes an HTTP/1.1 response to a writer
 func WriteHTTPResponse(w io.Writer, resp Response) error {
-	// Write status line
-	statusLine := fmt.Sprintf("HTTP/1.1 %d %s\r\n", resp.StatusCode.Int(), resp.StatusCode.Text())
-	if _, err := w.Write([]byte(statusLine)); err != nil {
-		return err
-	}
+	// Get pooled buffer
+	buf := responseBufPool.Get().([]byte)
+	buf = buf[:0]
 
-	// Write headers
+	// Return to pool when done (unless oversized)
+	defer func() {
+		if cap(buf) <= maxPooledBufSize {
+			responseBufPool.Put(buf[:0])
+		}
+	}()
+
+	// Build status line
+	buf = append(buf, "HTTP/1.1 "...)
+	buf = strconv.AppendInt(buf, int64(resp.StatusCode.Int()), 10)
+	buf = append(buf, ' ')
+	buf = append(buf, resp.StatusCode.Text()...)
+	buf = append(buf, '\r', '\n')
+
+	// Build headers
 	resp.Headers.Foreach(func(key string, values []string) {
 		for _, value := range values {
-			header := fmt.Sprintf("%s: %s\r\n", key, value)
-			w.Write([]byte(header))
+			buf = append(buf, key...)
+			buf = append(buf, ':', ' ')
+			buf = append(buf, value...)
+			buf = append(buf, '\r', '\n')
 		}
 	})
 
-	// Write Content-Length if body exists
+	// Add Connection: close since we don't support keep-alive yet
+	buf = append(buf, "Connection: close\r\n"...)
+
+	// Add Content-Length if body exists and not already set
 	bodyBytes := resp.Body.Bytes()
 	if len(bodyBytes) > 0 {
 		contentLengthOpt := resp.Headers.Get("Content-Length")
 		if contentLengthOpt.IsNone() {
-			contentLength := fmt.Sprintf("Content-Length: %d\r\n", len(bodyBytes))
-			w.Write([]byte(contentLength))
+			buf = append(buf, "Content-Length: "...)
+			buf = strconv.AppendInt(buf, int64(len(bodyBytes)), 10)
+			buf = append(buf, '\r', '\n')
 		}
 	}
 
 	// End headers
-	if _, err := w.Write([]byte("\r\n")); err != nil {
+	buf = append(buf, '\r', '\n')
+
+	// Write headers
+	if _, err := w.Write(buf); err != nil {
 		return err
 	}
 
@@ -142,6 +179,12 @@ func handleConnection(conn net.Conn, router *Router) {
 
 	// Handle the request
 	handlerResult := router.Handle(ctx)
+
+	// Drain any unread body data before responding
+	// This prevents EOF errors when client is still sending
+	if req.Body != nil {
+		io.Copy(io.Discard, req.Body.reader)
+	}
 
 	var resp Response
 	if handlerResult.IsOk() {

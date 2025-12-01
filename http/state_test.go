@@ -2,8 +2,6 @@ package http
 
 import (
 	"testing"
-
-	"github.com/marlaone/shepard"
 )
 
 // Test types for typed state
@@ -178,12 +176,14 @@ func TestWithState_Middleware(t *testing.T) {
 	middleware := WithState(config)
 
 	var capturedConfig AppConfig
-	handler := func() shepard.Result[Response, HttpError] {
+	handler := SimpleHandlerFunc(func(ctx *Context) Response {
 		capturedConfig = MustTypedState[AppConfig](ctx)
-		return TextOk("ok")
-	}
+		return Text("ok")
+	})
 
-	result := middleware(ctx, handler)
+	// Apply middleware to handler
+	wrappedHandler := middleware(handler)
+	result := wrappedHandler.Handle(ctx)
 	if result.IsErr() {
 		t.Fatal("expected Ok result")
 	}
@@ -279,12 +279,14 @@ func TestWithNamedState_Middleware(t *testing.T) {
 	middleware := WithNamedState("primary", DatabaseConn{Host: "primary.db"})
 
 	var capturedDB DatabaseConn
-	handler := func() shepard.Result[Response, HttpError] {
+	handler := SimpleHandlerFunc(func(ctx *Context) Response {
 		capturedDB = MustNamedState[DatabaseConn](ctx, "primary")
-		return TextOk("ok")
-	}
+		return Text("ok")
+	})
 
-	result := middleware(ctx, handler)
+	// Apply middleware to handler
+	wrappedHandler := middleware(handler)
+	result := wrappedHandler.Handle(ctx)
 	if result.IsErr() {
 		t.Fatal("expected Ok result")
 	}
