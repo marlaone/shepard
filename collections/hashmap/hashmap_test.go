@@ -1,6 +1,7 @@
 package hashmap_test
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/marlaone/shepard"
@@ -173,3 +174,70 @@ func BenchmarkGoMap(b *testing.B) {
 }
 
 func void(v int) {}
+
+func TestHashMap_MarshalJSON_Empty(t *testing.T) {
+	m := hashmap.New[string, int]()
+	data, err := json.Marshal(m)
+	assert.NoError(t, err)
+	assert.Equal(t, "{}", string(data))
+}
+
+func TestHashMap_MarshalJSON_StringKeys(t *testing.T) {
+	m := hashmap.New[string, int]()
+	m.Insert("a", 1)
+	m.Insert("b", 2)
+
+	data, err := json.Marshal(m)
+	assert.NoError(t, err)
+
+	var result map[string]int
+	err = json.Unmarshal(data, &result)
+	assert.NoError(t, err)
+	assert.Equal(t, map[string]int{"a": 1, "b": 2}, result)
+}
+
+func TestHashMap_MarshalJSON_IntKeys(t *testing.T) {
+	m := hashmap.New[int, string]()
+	m.Insert(1, "a")
+	m.Insert(2, "b")
+
+	data, err := json.Marshal(m)
+	assert.NoError(t, err)
+
+	var result map[int]string
+	err = json.Unmarshal(data, &result)
+	assert.NoError(t, err)
+	assert.Equal(t, map[int]string{1: "a", 2: "b"}, result)
+}
+
+func TestHashMap_UnmarshalJSON(t *testing.T) {
+	data := []byte(`{"x": 10, "y": 20}`)
+	var m hashmap.HashMap[string, int]
+	err := json.Unmarshal(data, &m)
+	assert.NoError(t, err)
+	assert.Equal(t, 10, *m.Get("x").Unwrap())
+	assert.Equal(t, 20, *m.Get("y").Unwrap())
+}
+
+func TestHashMap_JSON_RoundTrip(t *testing.T) {
+	original := hashmap.New[string, int]()
+	original.Insert("foo", 42)
+	original.Insert("bar", 99)
+
+	data, err := json.Marshal(original)
+	assert.NoError(t, err)
+
+	var restored hashmap.HashMap[string, int]
+	err = json.Unmarshal(data, &restored)
+	assert.NoError(t, err)
+
+	assert.Equal(t, original.Len(), restored.Len())
+	assert.Equal(t, *original.Get("foo").Unwrap(), *restored.Get("foo").Unwrap())
+	assert.Equal(t, *original.Get("bar").Unwrap(), *restored.Get("bar").Unwrap())
+}
+
+func TestHashMap_UnmarshalJSON_InvalidJSON(t *testing.T) {
+	var m hashmap.HashMap[string, int]
+	err := json.Unmarshal([]byte(`not valid json`), &m)
+	assert.Error(t, err)
+}

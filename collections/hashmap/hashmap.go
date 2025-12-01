@@ -1,16 +1,12 @@
 package hashmap
 
 import (
+	"slices"
+
 	"github.com/marlaone/shepard"
 	"github.com/marlaone/shepard/iter"
 	"golang.org/x/exp/constraints"
-	"slices"
 )
-
-type Pair[K comparable, V any] struct {
-	Key   K
-	Value V
-}
 
 type HashMap[K constraints.Ordered, V any] struct {
 	data map[K]*Entry[K, V]
@@ -157,7 +153,7 @@ func (m *HashMap[K, V]) Entry(key K) Entry[K, V] {
 	}
 	// Create vacant entry with back-reference for lazy insertion
 	// Key stored by value - no heap escape!
-	return Vacant[K, V](key, m)
+	return Vacant(key, m)
 }
 
 // Get returns the value corresponding to the key, without modifying the map.
@@ -192,11 +188,11 @@ func (m HashMap[K, V]) ContainsKey(k K) bool {
 func (m *HashMap[K, V]) Insert(k K, v V) shepard.Option[V] {
 	if existingEntry, ok := m.data[k]; ok && existingEntry.IsOccupied() {
 		oldValue := *existingEntry.Value()
-		e := Occupied[K, V](k, &v)
+		e := Occupied(k, &v)
 		m.data[k] = &e
 		return shepard.Some(oldValue)
 	}
-	e := Occupied[K, V](k, &v)
+	e := Occupied(k, &v)
 	m.data[k] = &e
 	return shepard.None[V]()
 }
@@ -215,7 +211,7 @@ func (m *HashMap[K, V]) Remove(k K) shepard.Option[V] {
 func (m *HashMap[K, V]) RemoveEntry(k K) shepard.Option[Pair[K, V]] {
 	opt := m.Remove(k)
 	if opt.IsSome() {
-		return shepard.Some[Pair[K, V]](Pair[K, V]{Key: k, Value: opt.Unwrap()})
+		return shepard.Some(Pair[K, V]{Key: k, Value: opt.Unwrap()})
 	}
 	return shepard.None[Pair[K, V]]()
 }
